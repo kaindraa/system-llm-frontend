@@ -21,6 +21,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 export const Assistant = () => {
   const runtime = useChatRuntime({
@@ -55,6 +56,10 @@ export const Assistant = () => {
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
+              {/* Theme toggle on the right */}
+              <div className="ml-auto">
+                <ThemeToggle />
+              </div>
             </header>
             <div className="flex-1 overflow-hidden">
               <Thread />
