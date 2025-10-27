@@ -1,22 +1,22 @@
 import { useCallback } from "react";
 import type { FC } from "react";
 import { PlusIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConversations } from "@/lib/hooks/useConversations";
 
 export const ThreadList: FC = () => {
-  const { createNew, conversations, isLoading } = useConversations();
+  const router = useRouter();
+  const { conversations, isLoading } = useConversations();
 
-  const handleNewThread = useCallback(async () => {
-    try {
-      console.log("[ThreadList] Creating new thread");
-      await createNew("New Chat");
-    } catch (error) {
-      console.error("Failed to create new thread:", error);
-    }
-  }, [createNew]);
+  const handleNewThread = useCallback(() => {
+    console.log("[ThreadList] Starting new conversation");
+    // Just navigate to root - will stay empty until first message sent
+    // Then conversation will be created with title from first message
+    router.push("/");
+  }, [router]);
 
   return (
     <div className="aui-root aui-thread-list-root flex flex-col items-stretch gap-1.5">

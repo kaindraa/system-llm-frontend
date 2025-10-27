@@ -35,7 +35,11 @@ import {
 
 import { cn } from "@/lib/utils";
 
-export const Thread: FC = () => {
+interface ThreadProps {
+  hasExistingMessages?: boolean;
+}
+
+export const Thread: FC<ThreadProps> = ({ hasExistingMessages = false }) => {
   return (
     <LazyMotion features={domAnimation}>
       <MotionConfig reducedMotion="user">
@@ -46,9 +50,12 @@ export const Thread: FC = () => {
           }}
         >
           <ThreadPrimitive.Viewport className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-4">
-            <ThreadPrimitive.If empty>
-              <ThreadWelcome />
-            </ThreadPrimitive.If>
+            {/* Only show welcome if thread is empty AND there are no existing messages */}
+            {!hasExistingMessages && (
+              <ThreadPrimitive.If empty>
+                <ThreadWelcome />
+              </ThreadPrimitive.If>
+            )}
 
             <ThreadPrimitive.Messages
               components={{

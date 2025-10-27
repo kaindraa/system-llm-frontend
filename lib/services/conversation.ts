@@ -10,6 +10,9 @@ export interface Conversation {
   createdAt: string;
   updatedAt: string;
   totalMessages: number;
+  model_id?: string;
+  prompt_id?: string;
+  prompt_name?: string;
 }
 
 export interface ConversationListResponse {
@@ -97,6 +100,9 @@ export async function createConversation(
     createdAt: data.started_at,
     updatedAt: data.started_at,
     totalMessages: data.total_messages || 0,
+    model_id: data.model_id,
+    prompt_id: data.prompt_id,
+    prompt_name: data.prompt?.name || data.prompt_name,
   };
 }
 
@@ -125,6 +131,9 @@ export async function updateConversation(
     createdAt: data.started_at,
     updatedAt: data.started_at,
     totalMessages: data.total_messages || 0,
+    model_id: data.model_id,
+    prompt_id: data.prompt_id,
+    prompt_name: data.prompt?.name || data.prompt_name,
   };
 }
 
@@ -139,6 +148,28 @@ export async function deleteConversation(id: string): Promise<void> {
 
   if (!response.ok) {
     throw new Error(`Failed to delete conversation: ${response.statusText}`);
+  }
+}
+
+/**
+ * Get prompt name by ID
+ */
+export async function getPromptName(promptId: string): Promise<string | null> {
+  try {
+    const response = await fetch(`${API_BASE}/prompts/${promptId}`, {
+      method: "GET",
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return data.name || null;
+  } catch (error) {
+    console.error("[getPromptName] Error fetching prompt:", error);
+    return null;
   }
 }
 
@@ -165,6 +196,9 @@ export async function getConversation(
     createdAt: data.started_at,
     updatedAt: data.started_at,
     totalMessages: data.total_messages || 0,
+    model_id: data.model_id,
+    prompt_id: data.prompt_id,
+    prompt_name: data.prompt?.name || data.prompt_name,
     messages: data.messages || [],
   };
 }

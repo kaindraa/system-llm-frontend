@@ -9,28 +9,24 @@ import { cn } from "@/lib/utils";
 export const ThreadWithHistory: FC = () => {
   const { threadId, messages: previousMessages, isLoading } = useCurrentThread();
 
-  // Show loading state while fetching conversation history
-  if (isLoading && threadId) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-muted-foreground border-t-primary"></div>
-          <p className="text-sm text-muted-foreground">Loading conversation...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="aui-root aui-thread-root @container flex h-full flex-col bg-background">
       <div className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-4">
-        {/* Render previous messages */}
+        {/* Render previous messages - keep visible even while loading */}
         {previousMessages && previousMessages.length > 0 && (
           <PreviousMessages messages={previousMessages} />
         )}
 
+        {/* Show subtle loading indicator if loading and no messages yet */}
+        {isLoading && threadId && (!previousMessages || previousMessages.length === 0) && (
+          <div className="flex items-center justify-center py-8">
+            <div className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-pulse"></div>
+          </div>
+        )}
+
         {/* Render new Thread for live messages and input */}
-        <Thread />
+        {/* Don't show welcome message if we already have previous messages loaded */}
+        <Thread hasExistingMessages={previousMessages && previousMessages.length > 0} />
       </div>
     </div>
   );

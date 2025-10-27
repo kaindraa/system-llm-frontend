@@ -110,40 +110,14 @@ export async function POST(req: Request) {
     const sessionIdHeader = req.headers.get("x-session-id");
     let session = existingSessionId || sessionIdHeader;
 
-    // If no session ID provided, create a new session
+    // Session ID must be provided - frontend creates conversation before sending message
     if (!session) {
-      try {
-        // backendUrl already includes /api/v1, so just append /chat/sessions
-        const createUrl = `${backendUrl}/chat/sessions`;
-
-        const createSessionResponse = await fetch(createUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            model_id: "gpt-4.1-nano",
-            title: "New Chat",
-          }),
-        });
-
-        if (!createSessionResponse.ok) {
-          const error = await createSessionResponse.text();
-          throw new Error(`Failed to create session: ${error}`);
-        }
-
-        const sessionData = await createSessionResponse.json();
-        session = sessionData.id;
-      } catch (error) {
-        return new Response(
-          JSON.stringify({
-            error: "Failed to create chat session",
-            details: error instanceof Error ? error.message : String(error),
-          }),
-          { status: 500, headers: { "Content-Type": "application/json" } }
-        );
-      }
+      return new Response(
+        JSON.stringify({
+          error: "Session ID required - conversation should be created before sending message",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
     }
 
     // Forward request to backend

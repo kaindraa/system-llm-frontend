@@ -18,7 +18,7 @@ export const useCurrentThread = () => {
   const loadMessages = useCallback(async (conversationId: string) => {
     setIsLoading(true);
     setError(null);
-    setMessages([]);
+    // Don't clear messages - keep showing old ones while loading new ones to avoid flicker
 
     try {
       const token =
@@ -74,7 +74,13 @@ export const useCurrentThread = () => {
   // Load messages when threadId changes
   useEffect(() => {
     if (threadId) {
-      loadMessages(threadId);
+      // Only try to load if it looks like a real UUID (not a temp one)
+      // Real UUIDs from backend are typically 36 chars, temp ones generated locally also are
+      // But we can check: if it fails to load, just treat as new
+      loadMessages(threadId).catch(() => {
+        // If loading fails, treat as new conversation (temp ID)
+        setMessages([]);
+      });
     } else {
       // No thread selected, start with empty messages
       setMessages([]);
