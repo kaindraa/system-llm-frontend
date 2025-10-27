@@ -42,10 +42,14 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     if (typeof window !== "undefined") {
-      localStorage.removeItem("user");
-      localStorage.removeItem("token");
+      localStorage.clear();
+      sessionStorage.clear();
     }
-    set({ user: null, token: null, isAuthenticated: false });
+    set({ user: null, token: null, isAuthenticated: false, isLoading: false });
+    // Force redirect to login
+    if (typeof window !== "undefined") {
+      window.location.href = "/login";
+    }
   },
 
   initializeAuth: () => {
