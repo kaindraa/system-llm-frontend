@@ -221,7 +221,7 @@ export default function SimpleChat() {
           </Button>
         </form>
       </div>
-    </div>
+      </div>
     </div>
   );
 }
