@@ -66,18 +66,23 @@ export async function listConversations(
 
 /**
  * Create a new conversation
+ *
+ * Note: Backend automatically uses the active prompt if available.
+ * No need to specify prompt_id from frontend.
  */
 export async function createConversation(
   title: string = "New Chat",
   modelId: string = "gpt-4.1-nano"
 ): Promise<Conversation> {
+  const body = {
+    title,
+    model_id: modelId,
+  };
+
   const response = await fetch(`${API_BASE}/chat/sessions`, {
     method: "POST",
     headers: getHeaders(),
-    body: JSON.stringify({
-      title,
-      model_id: modelId,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {

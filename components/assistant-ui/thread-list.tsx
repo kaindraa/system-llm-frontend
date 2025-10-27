@@ -28,6 +28,7 @@ export const ThreadList: FC = () => {
         <PlusIcon className="size-4" />
         New Chat
       </Button>
+
       <ThreadListItems conversations={conversations} isLoading={isLoading} />
     </div>
   );

@@ -51,7 +51,7 @@ export function useConversations() {
 
   const createNew = useCallback(async (title?: string) => {
     try {
-      const newConversation = await createConversation(title);
+      const newConversation = await createConversation(title, "gpt-4.1-nano");
       setState((prev) => ({
         ...prev,
         conversations: [newConversation, ...prev.conversations],
