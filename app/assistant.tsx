@@ -29,15 +29,13 @@ export const Assistant = () => {
   }, []);
 
   const runtime = useLocalRuntime({
-    async run({ messages, abortSignal }) {
-      console.log("[useLocalRuntime] run() called with messages:", messages);
+    async *run({ messages, abortSignal }) {
       const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
       if (!token) {
         throw new Error("No authentication token");
       }
 
-      console.log("[useLocalRuntime] Sending request to /api/chat");
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -48,7 +46,6 @@ export const Assistant = () => {
         signal: abortSignal,
       });
 
-      console.log("[useLocalRuntime] Response status:", response.status);
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`HTTP ${response.status}: ${errorText}`);
@@ -58,11 +55,11 @@ export const Assistant = () => {
         throw new Error("No response body");
       }
 
-      // Handle streaming response
+      // Parse SSE and stream content in real-time
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let contentBuffer = "";
+      let text = "";
 
       try {
         while (true) {
@@ -80,16 +77,23 @@ export const Assistant = () => {
                 try {
                   const data = JSON.parse(dataStr);
 
-                  // Handle text-delta events
+                  // Yield text-delta events immediately for real-time streaming
                   if (data.type === "text-delta" && data.textDelta) {
-                    contentBuffer += data.textDelta;
+                    text += data.textDelta;
+                    yield {
+                      content: [
+                        {
+                          type: "text",
+                          text: text,
+                        },
+                      ],
+                    };
                   }
 
-                  // Handle finish events
+                  // Handle finish event to complete streaming
                   if (data.type === "finish") {
-                    // Return the full accumulated content
-                    console.log("[useLocalRuntime] Received finish event, returning:", contentBuffer);
-                    return { text: contentBuffer };
+                    console.log("[streaming] Finished, final text:", text);
+                    return; // Exit generator to signal completion
                   }
                 } catch (e) {
                   // Silently ignore parsing errors
@@ -98,10 +102,6 @@ export const Assistant = () => {
             }
           }
         }
-
-        // If stream ended without explicit finish, return what we have
-        console.log("[useLocalRuntime] Stream ended, returning:", contentBuffer);
-        return { text: contentBuffer };
       } finally {
         reader.releaseLock();
       }
