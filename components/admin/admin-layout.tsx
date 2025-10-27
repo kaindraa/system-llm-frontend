@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { UserRole } from "@/types/auth";
 import { AdminSidebar } from "./admin-sidebar";
+import { AdminHeader } from "./admin-header";
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -51,8 +52,12 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children }) => {
   return (
     <div className="flex h-screen w-full">
       <AdminSidebar />
-      <div className="flex-1 overflow-hidden">
-        <main className="h-full overflow-y-auto bg-background">
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Header with theme toggle */}
+        <AdminHeader />
+
+        {/* Main content */}
+        <main className="flex-1 overflow-y-auto bg-background">
           {children}
         </main>
       </div>

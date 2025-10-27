@@ -121,45 +121,58 @@ export default function PromptPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">System Prompts</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage system prompts for chat sessions
-          </p>
+    <div className="flex flex-col gap-8">
+      {/* Page Header */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold tracking-tight">System Prompts</h1>
+            <p className="mt-2 text-base text-muted-foreground">
+              Create and manage system prompts for LLM conversations
+            </p>
+          </div>
+          <Button
+            onClick={() => handleOpenForm()}
+            size="lg"
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Create Prompt
+          </Button>
         </div>
-        <Button onClick={() => handleOpenForm()}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Prompt
-        </Button>
       </div>
 
-      {/* Search Bar */}
-      <div className="flex gap-2">
-        <input
-          type="text"
-          placeholder="Search prompts..."
-          value={searchTerm}
-          onChange={(e) => handleSearch(e.target.value)}
-          className="flex-1 rounded-md border border-input bg-background px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        />
+      {/* Search and Filters Card */}
+      <div className="rounded-lg border bg-card p-4">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Search by name or description..."
+            value={searchTerm}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="flex-1 rounded-md border border-input bg-background px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          />
+        </div>
       </div>
 
-      {/* Prompt List */}
-      <PromptList
-        prompts={prompts}
-        total={total}
-        currentPage={currentPage}
-        pageSize={PAGE_SIZE}
-        isLoading={isLoading}
-        onEdit={(prompt) => handleOpenForm(prompt)}
-        onDelete={handleDelete}
-        onActivate={handleActivate}
-        onCreateNew={() => handleOpenForm()}
-        onPageChange={handlePageChange}
-      />
+      {/* Content Card */}
+      <div className="rounded-lg border bg-card">
+        {/* Prompt List */}
+        <div className="p-6">
+          <PromptList
+            prompts={prompts}
+            total={total}
+            currentPage={currentPage}
+            pageSize={PAGE_SIZE}
+            isLoading={isLoading}
+            onEdit={(prompt) => handleOpenForm(prompt)}
+            onDelete={handleDelete}
+            onActivate={handleActivate}
+            onCreateNew={() => handleOpenForm()}
+            onPageChange={handlePageChange}
+          />
+        </div>
+      </div>
 
       {/* Form Modal */}
       <PromptFormModal
