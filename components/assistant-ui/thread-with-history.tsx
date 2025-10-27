@@ -10,7 +10,8 @@ export const ThreadWithHistory: FC = () => {
   const { threadId, messages: previousMessages, isLoading } = useCurrentThread();
 
   return (
-    <div className="aui-root aui-thread-root @container flex h-full flex-col bg-background">
+    <div className="aui-root aui-thread-root @container flex h-full w-full flex-col bg-background">
+      {/* Scrollable messages area - flex-1 to take available space */}
       <div className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-4">
         {/* Render previous messages - keep visible even while loading */}
         {previousMessages && previousMessages.length > 0 && (
@@ -23,9 +24,10 @@ export const ThreadWithHistory: FC = () => {
             <div className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-pulse"></div>
           </div>
         )}
+      </div>
 
-        {/* Render new Thread for live messages and input */}
-        {/* Don't show welcome message if we already have previous messages loaded */}
+      {/* Thread component - New messages (no previous messages shown here) and composer input */}
+      <div className="aui-thread-container w-full flex flex-col flex-shrink-0">
         <Thread hasExistingMessages={previousMessages && previousMessages.length > 0} />
       </div>
     </div>

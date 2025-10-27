@@ -90,6 +90,31 @@ export const Assistant = () => {
         throw new Error("No authentication token");
       }
 
+      // DEBUG: Log what token is in localStorage
+      console.log("[Assistant Runtime] Token from localStorage:");
+      console.log("[Assistant Runtime] Token length:", token?.length);
+      console.log("[Assistant Runtime] Token first 50:", token?.substring(0, 50));
+      console.log("[Assistant Runtime] Full token:", token);
+
+      // Try to decode payload without verification to see what's inside
+      if (token) {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          try {
+            const payload = JSON.parse(atob(parts[1]));
+            console.log("[Assistant Runtime] Token payload:", payload);
+            console.log("[Assistant Runtime] Has user_id?:", 'user_id' in payload);
+            console.log("[Assistant Runtime] Has id?:", 'id' in payload);
+            console.log("[Assistant Runtime] Has email?:", 'email' in payload);
+            console.log("[Assistant Runtime] Has role?:", 'role' in payload);
+          } catch (e) {
+            console.log("[Assistant Runtime] Could not decode payload:", e);
+          }
+        } else {
+          console.log("[Assistant Runtime] Token does not have 3 parts, has:", parts.length);
+        }
+      }
+
       let sessionId = threadId;
 
       // If it's a new conversation (no threadId or not in conversations), create it first
@@ -169,6 +194,12 @@ export const Assistant = () => {
         requestBody.sessionId = sessionId;
       }
 
+      // DEBUG: Log token and request details
+      console.log("[Assistant] Sending message request:");
+      console.log("[Assistant] Token:", token ? `${token.substring(0, 20)}...` : "NO TOKEN");
+      console.log("[Assistant] SessionId:", sessionId);
+      console.log("[Assistant] Request body:", requestBody);
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -179,8 +210,11 @@ export const Assistant = () => {
         signal: abortSignal,
       });
 
+      console.log("[Assistant] Response status:", response.status);
+
           if (!response.ok) {
             const errorText = await response.text();
+            console.log("[Assistant] Error response:", errorText);
             throw new Error(`HTTP ${response.status}: ${errorText}`);
           }
 

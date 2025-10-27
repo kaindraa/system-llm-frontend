@@ -3,16 +3,17 @@ import { NextRequest, NextResponse } from "next/server";
 export function middleware(request: NextRequest) {
   // Hanya untuk /api/chat
   if (request.nextUrl.pathname === "/api/chat") {
-    // Try to get token dari cookies first, then from Authorization header
-    let token = request.cookies.get("token")?.value;
+    // DEBUG: Log cookie dan header yang diterima
+    const cookieToken = request.cookies.get("token")?.value;
+    const authHeader = request.headers.get("authorization");
+    const authHeaderToken = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : null;
 
-    // If not in cookies, try to extract from Authorization header
-    if (!token) {
-      const authHeader = request.headers.get("authorization");
-      if (authHeader && authHeader.startsWith("Bearer ")) {
-        token = authHeader.substring(7); // Remove "Bearer " prefix
-      }
-    }
+    console.log("[Middleware] /api/chat request");
+    console.log("[Middleware] Cookie token:", cookieToken ? `${cookieToken.substring(0, 50)}...` : "NONE");
+    console.log("[Middleware] Auth header token:", authHeaderToken ? `${authHeaderToken.substring(0, 50)}...` : "NONE");
+
+    // FIXED: Use Authorization header token, NOT cookies!
+    let token = authHeaderToken;
 
     if (!token) {
       return NextResponse.json(
@@ -20,6 +21,8 @@ export function middleware(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    console.log("[Middleware] Using token:", token.substring(0, 50) + "...");
 
     // Lanjutkan request dengan token in Authorization header
     const requestHeaders = new Headers(request.headers);

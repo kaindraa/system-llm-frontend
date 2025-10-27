@@ -13,8 +13,16 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
+    // DEBUG: Log incoming request
+    console.log("[API Chat Route] Incoming request:");
+    console.log("[API Chat Route] Headers:", {
+      authorization: req.headers.get("authorization") ? `${req.headers.get("authorization")?.substring(0, 30)}...` : "MISSING",
+      contentType: req.headers.get("content-type"),
+    });
+
     // @assistant-ui library might send messages in different formats
     const { messages, message, threadId, sessionId } = body;
+    console.log("[API Chat Route] Body:", { messages: messages ? `${messages.length} messages` : "none", threadId, sessionId });
 
     let userMessage = "";
     let existingSessionId = threadId || sessionId;
@@ -120,8 +128,20 @@ export async function POST(req: Request) {
       );
     }
 
+    // DEBUG: Log token extraction details
+    console.log("[API Chat Route] Token extraction:");
+    console.log("[API Chat Route] Auth header received:", authHeader ? `${authHeader.substring(0, 30)}...` : "MISSING");
+    console.log("[API Chat Route] Extracted token length:", token?.length);
+    console.log("[API Chat Route] Extracted token first 50:", token?.substring(0, 50));
+    console.log("[API Chat Route] Extracted token last 20:", `...${token?.substring(Math.max(0, token.length - 20))}`);
+
     // Forward request to backend
     const messageUrl = `${backendUrl}/chat/sessions/${session}/messages`;
+    console.log("[API Chat Route] Forwarding to backend:");
+    console.log("[API Chat Route] URL:", messageUrl);
+    console.log("[API Chat Route] Authorization header being sent:", token ? `Bearer ${token.substring(0, 20)}...` : "MISSING");
+    console.log("[API Chat Route] Message:", userMessage);
+
     const backendResponse = await fetch(messageUrl, {
       method: "POST",
       headers: {
@@ -131,8 +151,11 @@ export async function POST(req: Request) {
       body: JSON.stringify({ message: userMessage }),
     });
 
+    console.log("[API Chat Route] Backend response status:", backendResponse.status);
+
     if (!backendResponse.ok) {
       const error = await backendResponse.text();
+      console.log("[API Chat Route] Backend error:", error);
       return new Response(error, {
         status: backendResponse.status,
         headers: {
