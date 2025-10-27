@@ -222,5 +222,6 @@ export default function SimpleChat() {
         </form>
       </div>
     </div>
+    </div>
   );
 }

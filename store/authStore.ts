@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { User } from "@/types/auth";
+import { User, UserRole } from "@/types/auth";
 
 interface AuthState {
   user: User | null;
@@ -12,6 +12,25 @@ interface AuthState {
   initializeAuth: () => void;
 }
 
+// Normalize role to uppercase (handle backend sending lowercase)
+const normalizeRole = (role: string | undefined): UserRole | undefined => {
+  if (!role) return undefined;
+  const normalized = role.toUpperCase();
+  if (normalized === "ADMIN" || normalized === "STUDENT") {
+    return normalized as UserRole;
+  }
+  return undefined;
+};
+
+// Ensure user role is normalized
+const normalizeUser = (user: User | null): User | null => {
+  if (!user) return null;
+  return {
+    ...user,
+    role: normalizeRole(user.role) || UserRole.STUDENT,
+  };
+};
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   token: null,
@@ -19,14 +38,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
 
   setUser: (user) => {
+    // Normalize user role before storing
+    const normalizedUser = normalizeUser(user);
+
     if (typeof window !== "undefined") {
-      if (user) {
-        localStorage.setItem("user", JSON.stringify(user));
+      if (normalizedUser) {
+        localStorage.setItem("user", JSON.stringify(normalizedUser));
       } else {
         localStorage.removeItem("user");
       }
     }
-    set({ user, isAuthenticated: !!user });
+    set({ user: normalizedUser, isAuthenticated: !!normalizedUser });
   },
 
   setToken: (token) => {
@@ -56,7 +78,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("token");
       const userStr = localStorage.getItem("user");
-      const user = userStr ? JSON.parse(userStr) : null;
+      let user = userStr ? JSON.parse(userStr) : null;
+
+      // Normalize user role when loading from localStorage
+      user = normalizeUser(user);
+
+      console.log("[AuthStore] Initialized - user:", user?.email, "role:", user?.role);
       set({ user, token, isAuthenticated: !!(user && token), isLoading: false });
     } else {
       set({ isLoading: false });

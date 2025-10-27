@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import { useLocalRuntime } from "@assistant-ui/react";
-import { Thread } from "@/components/assistant-ui/thread";
+import { ThreadWithHistory } from "@/components/assistant-ui/thread-with-history";
 import {
   SidebarInset,
   SidebarProvider,
@@ -21,12 +21,16 @@ import {
 } from "@/components/ui/breadcrumb";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { initializeSession } from "@/lib/chat-transport";
+import { useCurrentThread } from "@/lib/hooks/useCurrentThread";
 
 export const Assistant = () => {
   // Initialize session from localStorage on mount
   useEffect(() => {
     initializeSession();
   }, []);
+
+  // Get threadId to pass to chat API
+  const { threadId } = useCurrentThread();
 
   const runtime = useLocalRuntime({
     async *run({ messages, abortSignal }) {
@@ -36,77 +40,84 @@ export const Assistant = () => {
         throw new Error("No authentication token");
       }
 
+      // Prepare request body with threadId if available
+      const requestBody: any = { messages };
+      if (threadId) {
+        requestBody.threadId = threadId;
+        requestBody.sessionId = threadId;
+      }
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ messages }),
+        body: JSON.stringify(requestBody),
         signal: abortSignal,
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+          }
 
-      if (!response.body) {
-        throw new Error("No response body");
-      }
+          if (!response.body) {
+            throw new Error("No response body");
+          }
 
-      // Parse SSE and stream content in real-time
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let text = "";
+          // Parse SSE and stream content in real-time
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let text = "";
 
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n");
+              buffer = lines.pop() || "";
 
-          for (const line of lines) {
-            if (line.startsWith("data:")) {
-              const dataStr = line.slice(5).trim();
-              if (dataStr) {
-                try {
-                  const data = JSON.parse(dataStr);
+              for (const line of lines) {
+                if (line.startsWith("data:")) {
+                  const dataStr = line.slice(5).trim();
+                  if (dataStr) {
+                    try {
+                      const data = JSON.parse(dataStr);
 
-                  // Yield text-delta events immediately for real-time streaming
-                  if (data.type === "text-delta" && data.textDelta) {
-                    text += data.textDelta;
-                    yield {
-                      content: [
-                        {
-                          type: "text",
-                          text: text,
-                        },
-                      ],
-                    };
+                      // Yield text-delta events immediately for real-time streaming
+                      if (data.type === "text-delta" && data.textDelta) {
+                        text += data.textDelta;
+                        yield {
+                          content: [
+                            {
+                              type: "text",
+                              text: text,
+                            },
+                          ],
+                        };
+                      }
+
+                      // Handle finish event to complete streaming
+                      if (data.type === "finish") {
+                        console.log("[streaming] Finished, final text:", text);
+                        return; // Exit generator to signal completion
+                      }
+                    } catch (e) {
+                      // Silently ignore parsing errors
+                    }
                   }
-
-                  // Handle finish event to complete streaming
-                  if (data.type === "finish") {
-                    console.log("[streaming] Finished, final text:", text);
-                    return; // Exit generator to signal completion
-                  }
-                } catch (e) {
-                  // Silently ignore parsing errors
                 }
               }
             }
+          } finally {
+            reader.releaseLock();
           }
-        }
-      } finally {
-        reader.releaseLock();
-      }
-    },
-  });
+        },
+      });
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
@@ -140,7 +151,7 @@ export const Assistant = () => {
               </div>
             </header>
             <div className="flex-1 overflow-hidden">
-              <Thread />
+              <ThreadWithHistory />
             </div>
           </SidebarInset>
         </div>

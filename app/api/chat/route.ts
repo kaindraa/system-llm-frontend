@@ -14,9 +14,10 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     // @assistant-ui library might send messages in different formats
-    const { messages, message } = body;
+    const { messages, message, threadId, sessionId } = body;
 
     let userMessage = "";
+    let existingSessionId = threadId || sessionId;
 
     if (message) {
       // Direct format: { message: "..." }
@@ -107,9 +108,9 @@ export async function POST(req: Request) {
     const backendUrl =
       process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
     const sessionIdHeader = req.headers.get("x-session-id");
-    let session = sessionIdHeader;
+    let session = existingSessionId || sessionIdHeader;
 
-    // If no session ID in header, create a new session
+    // If no session ID provided, create a new session
     if (!session) {
       try {
         // backendUrl already includes /api/v1, so just append /chat/sessions
