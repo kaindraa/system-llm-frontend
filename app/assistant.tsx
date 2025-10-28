@@ -48,7 +48,7 @@ export const Assistant = () => {
 
   // Fetch and store config for use in runtime
   const [config, setConfig] = useState<ConfigData | null>(null);
-  const [selectedModelName, setSelectedModelName] = useState<string>("gpt-4.1-nano");
+  const [selectedModelName, setSelectedModelName] = useState<string>("GPT-4.1 Nano");
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -323,12 +323,12 @@ const AssistantContent = ({
   // When at a conversation, show conversation's model and prompt
   useEffect(() => {
     if (currentConversation && threadId) {
-      // Set model name from conversation
+      // Set model name from conversation (model_id is UUID)
       if (config && config.models) {
-        const model = config.models.find((m) => m.name === currentConversation.model_id);
-        setModelName(model?.display_name || currentConversation.model_id || "gpt-4.1-nano");
+        const model = config.models.find((m) => m.id === currentConversation.model_id);
+        setModelName(model?.display_name || "Unknown Model");
       } else {
-        setModelName(currentConversation.model_id || "gpt-4.1-nano");
+        setModelName("Unknown Model");
       }
 
       // Fetch prompt name from prompt_id
