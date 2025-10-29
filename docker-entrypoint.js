@@ -15,8 +15,8 @@ const env = {
   const command = args.join(' ')
 
   if (command === 'pnpm run start') {
-    console.log('[docker-entrypoint] Starting custom server on 0.0.0.0:3000...')
-    await exec('node /app/server.js')
+    console.log('[docker-entrypoint] Starting standalone server on 0.0.0.0:3000...')
+    await exec('node /app/.next/standalone/server.js')
   } else {
     // launch application with explicit environment variables
     await exec(command)
