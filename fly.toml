@@ -11,6 +11,8 @@ primary_region = 'sin'
 [env]
   HOSTNAME = "0.0.0.0"
   PORT = "3000"
+  NEXT_PUBLIC_API_BASE_URL = "https://system-llm-backend-121635597125.asia-southeast2.run.app/api/v1"
+  NEXT_PUBLIC_APP_NAME = "System LLM"
 
 [http_service]
   internal_port = 3000

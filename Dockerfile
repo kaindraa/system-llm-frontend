@@ -12,6 +12,10 @@ WORKDIR /app
 # Set production environment
 ENV NODE_ENV="production"
 
+# Set backend API URL for production
+ENV NEXT_PUBLIC_API_BASE_URL="https://system-llm-backend-121635597125.asia-southeast2.run.app/api/v1"
+ENV NEXT_PUBLIC_APP_NAME="System LLM"
+
 # Install pnpm
 ARG PNPM_VERSION=10.20.0
 RUN npm install -g pnpm@$PNPM_VERSION
