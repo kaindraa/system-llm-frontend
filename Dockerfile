@@ -51,6 +51,10 @@ FROM base
 # Copy built application
 COPY --from=build /app /app
 
+# Copy public folder to standalone for static files serving
+RUN mkdir -p /app/.next/standalone/public && \
+    cp -r /app/public/* /app/.next/standalone/public/ || true
+
 # Make entrypoint executable
 RUN chmod +x /app/docker-entrypoint.js
 
