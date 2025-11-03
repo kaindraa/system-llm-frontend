@@ -34,8 +34,13 @@ export const ThreadWithHistory: FC = () => {
   );
 };
 
+interface ContentBlock {
+  type?: string;
+  text?: string;
+}
+
 interface PreviousMessagesProps {
-  messages: Array<{ role: string; content: string | any[] }>;
+  messages: Array<{ role: string; content: string | Array<ContentBlock> }>;
 }
 
 const PreviousMessages: FC<PreviousMessagesProps> = ({ messages }) => {
@@ -63,8 +68,8 @@ const PreviousMessages: FC<PreviousMessagesProps> = ({ messages }) => {
                 ? msg.content
                 : Array.isArray(msg.content)
                 ? msg.content
-                    .filter((c: any) => c.type === "text")
-                    .map((c: any) => c.text || "")
+                    .filter((c: ContentBlock) => c.type === "text")
+                    .map((c: ContentBlock) => c.text || "")
                     .join("")
                 : ""}
             </p>

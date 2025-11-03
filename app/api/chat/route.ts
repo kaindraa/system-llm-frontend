@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     console.log("[API Chat Route] Body:", { messages: messages ? `${messages.length} messages` : "none", threadId, sessionId });
 
     let userMessage = "";
-    let existingSessionId = threadId || sessionId;
+    const existingSessionId = threadId || sessionId;
 
     if (message) {
       // Direct format: { message: "..." }
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
 
         // First check for parts array (Vercel AI SDK format)
         if (Array.isArray(msg.parts)) {
-          const textParts = (msg.parts as any[])
+          const textParts = (msg.parts as Array<{ type?: string; text?: string }>)
             .filter((part) => part.type === "text")
             .map((part) => part.text)
             .join("");
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
           msgContent = msg.content;
         } else if (Array.isArray(msg.content)) {
           // Content is array of parts
-          const textParts = (msg.content as any[])
+          const textParts = (msg.content as Array<{ type?: string; text?: string }>)
             .filter((part) => part.type === "text")
             .map((part) => part.text)
             .join("");
@@ -116,7 +116,7 @@ export async function POST(req: Request) {
     const backendUrl =
       process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
     const sessionIdHeader = req.headers.get("x-session-id");
-    let session = existingSessionId || sessionIdHeader;
+    const session = existingSessionId || sessionIdHeader;
 
     // Session ID must be provided - frontend creates conversation before sending message
     if (!session) {
@@ -252,7 +252,7 @@ export async function POST(req: Request) {
                         encoder.encode(`data: ${JSON.stringify(errorResponse)}\n\n`)
                       );
                     }
-                  } catch (e) {
+                  } catch {
                     // Silently ignore parsing errors
                   }
                 }

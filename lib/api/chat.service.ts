@@ -73,7 +73,7 @@ export const chatService = {
     message: string
   ): AsyncGenerator<{
     type: "user_message" | "chunk" | "done" | "error";
-    content: any;
+    content: { role?: string; content?: string; error?: string };
   }> {
     // Get token from localStorage
     const token =

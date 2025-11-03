@@ -34,7 +34,12 @@ export const ThreadList: FC = () => {
   );
 };
 
-const ThreadListItems: FC<{ conversations: any[]; isLoading: boolean }> = ({
+interface ThreadListItemsProps {
+  conversations: Array<{ id: string; title: string }>;
+  isLoading: boolean;
+}
+
+const ThreadListItems: FC<ThreadListItemsProps> = ({
   conversations,
   isLoading,
 }) => {

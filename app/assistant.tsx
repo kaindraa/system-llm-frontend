@@ -124,7 +124,7 @@ export const Assistant = () => {
         // Extract first user message as title
         let title = "New Chat";
         if (messages && messages.length > 0) {
-          const firstUserMessage = messages.find((msg: any) => msg.role === "user");
+          const firstUserMessage = messages.find((msg: { role?: string }) => msg.role === "user");
           if (firstUserMessage) {
             let messageText = "";
             if (typeof firstUserMessage.content === "string") {
@@ -153,7 +153,11 @@ export const Assistant = () => {
           const modelId = selectedModel?.name || "gpt-4.1-nano";
           const promptId = config?.active_prompt?.id;
 
-          const createBody: any = {
+          const createBody: {
+            model_id: string;
+            title: string;
+            prompt_id?: string;
+          } = {
             model_id: modelId,
             title: title,
           };
@@ -188,7 +192,11 @@ export const Assistant = () => {
       }
 
       // Prepare request body for sending message
-      const requestBody: any = { messages };
+      const requestBody: {
+        messages: typeof messages;
+        threadId?: string;
+        sessionId?: string;
+      } = { messages };
       if (sessionId) {
         requestBody.threadId = sessionId;
         requestBody.sessionId = sessionId;
@@ -262,7 +270,7 @@ export const Assistant = () => {
                         console.log("[streaming] Finished, final text:", text);
                         return; // Exit generator to signal completion
                       }
-                    } catch (e) {
+                    } catch {
                       // Silently ignore parsing errors
                     }
                   }

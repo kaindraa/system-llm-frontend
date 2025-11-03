@@ -53,7 +53,10 @@ export const useCurrentThread = () => {
 
       // Transform backend messages to @assistant-ui format
       if (data.messages && Array.isArray(data.messages)) {
-        const formattedMessages = data.messages.map((msg: any) => ({
+        const formattedMessages = data.messages.map((msg: {
+          role?: string;
+          content?: string | Array<{ type?: string; text?: string }>
+        }) => ({
           role: msg.role || "user",
           content:
             typeof msg.content === "string"

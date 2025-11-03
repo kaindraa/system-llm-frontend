@@ -173,12 +173,22 @@ export async function getPromptName(promptId: string): Promise<string | null> {
   }
 }
 
+interface MessageContentBlock {
+  type?: string;
+  text?: string;
+}
+
+interface ConversationMessage {
+  role?: string;
+  content?: string | Array<MessageContentBlock>;
+}
+
 /**
  * Get a specific conversation with all messages
  */
 export async function getConversation(
   id: string
-): Promise<Conversation & { messages: any[] }> {
+): Promise<Conversation & { messages: Array<ConversationMessage> }> {
   const response = await fetch(`${API_BASE}/chat/sessions/${id}`, {
     method: "GET",
     headers: getHeaders(),

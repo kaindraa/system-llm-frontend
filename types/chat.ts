@@ -1,8 +1,15 @@
+interface MessageSource {
+  id?: string;
+  title?: string;
+  url?: string;
+  relevance?: number;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
   created_at: string;
-  sources?: any[] | null;
+  sources?: MessageSource[] | null;
 }
 
 export interface ChatSession {

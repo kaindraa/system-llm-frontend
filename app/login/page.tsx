@@ -77,9 +77,10 @@ export default function LoginPage() {
 
       // Redirect to dashboard
       router.push("/");
-    } catch (err: any) {
+    } catch (err) {
+      const error = err as { response?: { data?: { detail?: string } } };
       setError(
-        err.response?.data?.detail || "Login failed. Please try again."
+        error.response?.data?.detail || "Login failed. Please try again."
       );
     } finally {
       setIsLoading(false);
