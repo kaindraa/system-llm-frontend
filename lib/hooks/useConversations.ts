@@ -45,9 +45,16 @@ export function useConversations() {
       const data = await listConversations();
       console.log("[useConversations] Loaded conversations:", data.sessions.length);
 
+      // Sort conversations by createdAt descending (newest first)
+      const sortedConversations = [...data.sessions].sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      });
+
       setState((prev) => ({
         ...prev,
-        conversations: data.sessions,
+        conversations: sortedConversations,
         isLoading: false,
         error: null,
       }));
@@ -62,6 +69,7 @@ export function useConversations() {
       loadingRef.current = false;
     }
   }, []);
+
 
   // Load conversations on mount (only once)
   useEffect(() => {
@@ -124,6 +132,26 @@ export function useConversations() {
     setState((prev) => ({ ...prev, activeConversationId: id }));
   }, []);
 
+  // Optimistically add a conversation to the top of the list (currently not used)
+  const prependConversation = useCallback((conversation: any) => {
+    setState((prev) => {
+      const exists = prev.conversations.some((c) => c.id === conversation.id);
+      if (exists) {
+        return {
+          ...prev,
+          conversations: [
+            conversation,
+            ...prev.conversations.filter((c) => c.id !== conversation.id),
+          ],
+        };
+      }
+      return {
+        ...prev,
+        conversations: [conversation, ...prev.conversations],
+      };
+    });
+  }, []);
+
   return {
     ...state,
     loadConversations,
@@ -131,5 +159,6 @@ export function useConversations() {
     rename,
     delete: delete_,
     setActive,
+    prependConversation,
   };
 }

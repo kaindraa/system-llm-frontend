@@ -27,7 +27,7 @@ interface ChatContainerProps {
 export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps) => {
   const router = useRouter();
   const { threadId, messages: previousMessages, isLoading } = useCurrentThread();
-  const { conversations, loadConversations } = useConversations();
+  const { loadConversations } = useConversations();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -129,10 +129,9 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
 
     // If no threadId, create conversation first
     if (!threadId) {
-      console.log("[ChatContainer] No threadId, need to create conversation first");
+      console.log("[ChatContainer] Creating new conversation...");
       setIsCreatingConversation(true);
       try {
-        console.log("[ChatContainer] Creating new conversation");
 
         const token =
           typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -174,13 +173,10 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
         activeThreadId = sessionData.id;
         navigateToThreadId = sessionData.id;
 
-        console.log("[ChatContainer] Conversation created with ID:", activeThreadId);
-        console.log("[ChatContainer] Will navigate to:", navigateToThreadId);
+        console.log("[ChatContainer] Conversation created:", activeThreadId);
 
-        // Update sidebar
-        console.log("[ChatContainer] Reloading conversations...");
+        // Reload sidebar conversations with loading skeleton
         await loadConversations();
-        console.log("[ChatContainer] Conversations reloaded");
       } catch (error) {
         console.error("[ChatContainer] Error creating conversation:", error);
         setMessages((prev) => [
@@ -330,35 +326,15 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
         },
       ]);
     } finally {
-      console.log("[ChatContainer] Finally block - cleanup and reset");
-
-      // CRITICAL: Reset all sending states
-      console.log("[ChatContainer] Resetting isSending...");
+      // Reset all sending states
       setIsSending(false);
-
-      console.log("[ChatContainer] Resetting isStreaming...");
       setIsStreaming(false);
-
-      // Log final state
-      console.log("[ChatContainer] State reset complete. Final state:", {
-        isSending: false,
-        isStreaming: false,
-        navigateToThreadId,
-      });
 
       // Navigate AFTER everything is done
       if (navigateToThreadId) {
-        console.log("[ChatContainer] NAVIGATING to new conversation:", navigateToThreadId);
-        console.log("[ChatContainer] Current URL before navigation:", window.location.href);
-
         if (isMountedRef.current) {
           router.push(`/?thread=${navigateToThreadId}`);
-          console.log("[ChatContainer] router.push called successfully");
-        } else {
-          console.log("[ChatContainer] ERROR: Component unmounted, cannot navigate");
         }
-      } else {
-        console.log("[ChatContainer] No navigation needed (threaded message)");
       }
     }
   };
