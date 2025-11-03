@@ -1,44 +1,134 @@
 "use client";
 
 import type { FC } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { TrashIcon, PlusIcon, MessageSquare } from "lucide-react";
+import { TrashIcon, PlusIcon, MessageSquare, RefreshCwIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useConversations } from "@/lib/hooks/useConversations";
-import { useCurrentThread } from "@/lib/hooks/useCurrentThread";
 import { cn } from "@/lib/utils";
+import { listConversations, deleteConversation, type Conversation } from "@/lib/services/conversation";
 
 export const ThreadList: FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentThreadId = searchParams.get("thread");
 
+  // Local state - completely independent from useConversations
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch conversations on mount
+  useEffect(() => {
+    loadConversationsLocal();
+  }, []);
+
+  // Auto-refresh when URL changes (new thread navigated)
+  useEffect(() => {
+    if (currentThreadId) {
+      console.log("[ThreadList] URL changed to thread:", currentThreadId);
+      console.log("[ThreadList] Auto-refreshing sidebar...");
+      loadConversationsLocal();
+    }
+  }, [currentThreadId]);
+
+  const loadConversationsLocal = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      console.log("[ThreadList] Fetching conversations from API...");
+      const data = await listConversations();
+      const sorted = [...data.sessions].sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      });
+      console.log("[ThreadList] Fetched and set", sorted.length, "conversations");
+      setConversations(sorted);
+    } catch (err) {
+      console.error("[ThreadList] Error fetching:", err);
+      setError(err instanceof Error ? err.message : "Failed to load conversations");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      console.log("[ThreadList] Manual refresh - fetching conversations from DB...");
+      await loadConversationsLocal();
+      console.log("[ThreadList] Manual refresh complete - conversations updated");
+    } catch (error) {
+      console.error("[ThreadList] Error during refresh:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleDelete = async (id: string, title: string) => {
+    if (confirm(`Delete "${title}"?`)) {
+      try {
+        await deleteConversation(id);
+        // Remove from local state immediately
+        setConversations((prev) => prev.filter((c) => c.id !== id));
+        console.log("[ThreadList] Deleted conversation:", id);
+      } catch (error) {
+        console.error("[ThreadList] Error deleting conversation:", error);
+      }
+    }
+  };
+
   return (
     <div className="aui-root aui-thread-list-root flex flex-col items-stretch gap-1.5">
-      {/* New Chat Button */}
-      <Button
-        className="aui-thread-list-new flex items-center justify-start gap-2 rounded-lg px-2.5 py-2 text-start hover:bg-muted"
-        variant="ghost"
-        onClick={() => router.push("/")}
-      >
-        <PlusIcon className="h-4 w-4" />
-        <span>New Chat</span>
-      </Button>
+      {/* Buttons Row */}
+      <div className="flex gap-2">
+        {/* New Chat Button */}
+        <Button
+          className="aui-thread-list-new flex items-center justify-start gap-2 flex-1 rounded-lg px-2.5 py-2 text-start hover:bg-muted"
+          variant="ghost"
+          onClick={() => router.push("/")}
+        >
+          <PlusIcon className="h-4 w-4" />
+          <span>New Chat</span>
+        </Button>
 
-      {/* Conversations List */}
-      <ThreadListItems currentThreadId={currentThreadId} />
+        {/* Refresh Button */}
+        <Button
+          className="aui-thread-list-refresh flex items-center justify-center gap-2 rounded-lg px-2.5 py-2 hover:bg-muted"
+          variant="ghost"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          title="Refresh conversations from database"
+        >
+          <RefreshCwIcon className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+        </Button>
+      </div>
+
+      {/* Conversations List - render directly */}
+      <ThreadListItems
+        conversations={conversations}
+        isLoading={isLoading}
+        error={error}
+        currentThreadId={currentThreadId}
+        onDelete={handleDelete}
+      />
     </div>
   );
 };
 
 interface ThreadListItemsProps {
+  conversations: Conversation[];
+  isLoading: boolean;
+  error: string | null;
   currentThreadId: string | null;
+  onDelete: (id: string, title: string) => void;
 }
 
-const ThreadListItems: FC<ThreadListItemsProps> = ({ currentThreadId }) => {
-  const { conversations, isLoading, error } = useConversations();
+const ThreadListItems: FC<ThreadListItemsProps> = ({ conversations, isLoading, error, currentThreadId, onDelete }) => {
 
   if (isLoading) {
     return <ThreadListSkeleton />;
@@ -67,6 +157,7 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({ currentThreadId }) => {
           key={conversation.id}
           conversation={conversation}
           isActive={currentThreadId === conversation.id}
+          onDelete={onDelete}
         />
       ))}
     </div>
@@ -92,35 +183,25 @@ const ThreadListSkeleton: FC = () => {
 };
 
 interface ThreadListItemProps {
-  conversation: {
-    id: string;
-    title: string;
-    status: "active" | "completed";
-    updatedAt?: string;
-  };
+  conversation: Conversation;
   isActive: boolean;
+  onDelete: (id: string, title: string) => void;
 }
 
 const ThreadListItem: FC<ThreadListItemProps> = ({
   conversation,
   isActive,
+  onDelete,
 }) => {
   const router = useRouter();
-  const { delete: deleteConversation } = useConversations();
 
   const handleNavigate = () => {
     router.push(`/?thread=${conversation.id}`);
   };
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Delete "${conversation.title}"?`)) {
-      try {
-        await deleteConversation(conversation.id);
-      } catch (error) {
-        console.error("Failed to delete conversation:", error);
-      }
-    }
+    onDelete(conversation.id, conversation.title);
   };
 
   return (

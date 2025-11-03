@@ -26,24 +26,27 @@ export function useConversations() {
     activeConversationId: null,
   });
 
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const loadingRef = useRef(false);
   const isInitialized = useRef(false);
 
   // Define loadConversations with useCallback
   const loadConversations = useCallback(async () => {
-    // Prevent duplicate fetches - but allow if explicitly called
+    // Prevent duplicate fetches
     if (loadingRef.current) {
       console.log("[useConversations] Load already in progress, skipping");
       return;
     }
 
     loadingRef.current = true;
+    console.log("[useConversations] Setting isLoading to true");
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      console.log("[useConversations] Loading conversations...");
+      console.log("[useConversations] Loading conversations from API...");
       const data = await listConversations();
-      console.log("[useConversations] Loaded conversations:", data.sessions.length);
+      console.log("[useConversations] API returned conversations:", data.sessions.length);
+      console.log("[useConversations] Conversations data:", data.sessions);
 
       // Sort conversations by createdAt descending (newest first)
       const sortedConversations = [...data.sessions].sort((a, b) => {
@@ -52,12 +55,19 @@ export function useConversations() {
         return dateB - dateA;
       });
 
+      console.log("[useConversations] Setting state with", sortedConversations.length, "conversations");
       setState((prev) => ({
         ...prev,
         conversations: sortedConversations,
         isLoading: false,
         error: null,
       }));
+      // Trigger re-render by incrementing refresh trigger
+      setRefreshTrigger((prev) => {
+        console.log("[useConversations] Triggering refresh, new trigger value:", prev + 1);
+        return prev + 1;
+      });
+      console.log("[useConversations] Load complete - isLoading false, state updated");
     } catch (error) {
       console.error("[useConversations] Error loading:", error);
       setState((prev) => ({
@@ -67,6 +77,7 @@ export function useConversations() {
       }));
     } finally {
       loadingRef.current = false;
+      console.log("[useConversations] Reset loading flag");
     }
   }, []);
 
