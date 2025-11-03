@@ -61,8 +61,21 @@ export async function listConversations(
   }
 
   const data = await response.json();
+
+  // Transform backend response to frontend format
+  const transformedSessions = (data.sessions || []).map((session: any) => ({
+    id: session.id,
+    title: session.title || "Untitled",
+    status: (session.status?.toLowerCase() || "active") as "active" | "completed",
+    createdAt: session.started_at,
+    updatedAt: session.started_at, // Backend doesn't track updated_at, use started_at
+    totalMessages: session.total_messages || 0,
+    model_id: session.model_id,
+    prompt_id: session.prompt_id,
+  }));
+
   return {
-    sessions: data.sessions || [],
+    sessions: transformedSessions,
     total: data.total || 0,
   };
 }

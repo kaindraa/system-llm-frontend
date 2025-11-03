@@ -2,7 +2,7 @@
  * Hook untuk manage conversations dari backend
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   listConversations,
   createConversation,
@@ -26,28 +26,46 @@ export function useConversations() {
     activeConversationId: null,
   });
 
-  // Load conversations on mount
-  useEffect(() => {
-    loadConversations();
-  }, []);
+  const loadingRef = useRef(false);
+  const isInitialized = useRef(false);
 
+  // Define loadConversations with useCallback
   const loadConversations = useCallback(async () => {
+    // Prevent duplicate fetches
+    if (loadingRef.current) return;
+
+    loadingRef.current = true;
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
+
     try {
+      console.log("[useConversations] Loading conversations...");
       const data = await listConversations();
+      console.log("[useConversations] Loaded conversations:", data.sessions.length);
+
       setState((prev) => ({
         ...prev,
         conversations: data.sessions,
         isLoading: false,
       }));
     } catch (error) {
+      console.error("[useConversations] Error loading:", error);
       setState((prev) => ({
         ...prev,
         error: error instanceof Error ? error.message : "Failed to load conversations",
         isLoading: false,
       }));
+    } finally {
+      loadingRef.current = false;
     }
   }, []);
+
+  // Load conversations on mount (only once)
+  useEffect(() => {
+    if (!isInitialized.current) {
+      isInitialized.current = true;
+      loadConversations();
+    }
+  }, [loadConversations]);
 
   const createNew = useCallback(async (title?: string) => {
     try {
