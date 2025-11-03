@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import { useLocalRuntime } from "@assistant-ui/react";
-import { Thread } from "@/components/assistant-ui/thread";
+import { ThreadWithHistory } from "@/components/assistant-ui/thread-with-history";
 import {
   SidebarInset,
   SidebarProvider,
@@ -14,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
   BreadcrumbItem,
+  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
@@ -25,7 +27,6 @@ import { useCurrentThread } from "@/lib/hooks/useCurrentThread";
 import { useConversations } from "@/lib/hooks/useConversations";
 import { trimTitle } from "@/lib/utils";
 import { getPromptName } from "@/lib/services/conversation";
-import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 
 interface ConfigData {
@@ -39,11 +40,14 @@ export const Assistant = () => {
     initializeSession();
   }, []);
 
-  const router = useRouter();
+  // Get threadId and conversations
   const { threadId } = useCurrentThread();
   const { conversations, loadConversations } = useConversations();
 
-  // Fetch config with models
+  // Use for updating URL when new session created
+  const router = useRouter();
+
+  // Fetch and store config for use in runtime
   const [config, setConfig] = useState<ConfigData | null>(null);
   const [selectedModelName, setSelectedModelName] = useState<string>("GPT-4.1 Nano");
 
@@ -64,6 +68,7 @@ export const Assistant = () => {
         if (response.ok) {
           const data = await response.json();
           setConfig(data);
+          // Set initial selected model to first model
           if (data.models && data.models.length > 0) {
             setSelectedModelName(data.models[0].display_name);
           }
@@ -84,6 +89,31 @@ export const Assistant = () => {
 
       if (!token) {
         throw new Error("No authentication token");
+      }
+
+      // DEBUG: Log what token is in localStorage
+      console.log("[Assistant Runtime] Token from localStorage:");
+      console.log("[Assistant Runtime] Token length:", token?.length);
+      console.log("[Assistant Runtime] Token first 50:", token?.substring(0, 50));
+      console.log("[Assistant Runtime] Full token:", token);
+
+      // Try to decode payload without verification to see what's inside
+      if (token) {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          try {
+            const payload = JSON.parse(atob(parts[1]));
+            console.log("[Assistant Runtime] Token payload:", payload);
+            console.log("[Assistant Runtime] Has user_id?:", 'user_id' in payload);
+            console.log("[Assistant Runtime] Has id?:", 'id' in payload);
+            console.log("[Assistant Runtime] Has email?:", 'email' in payload);
+            console.log("[Assistant Runtime] Has role?:", 'role' in payload);
+          } catch (e) {
+            console.log("[Assistant Runtime] Could not decode payload:", e);
+          }
+        } else {
+          console.log("[Assistant Runtime] Token does not have 3 parts, has:", parts.length);
+        }
       }
 
       let sessionId = threadId;
@@ -112,15 +142,29 @@ export const Assistant = () => {
           }
         }
 
-        // Create conversation
+        // Create conversation using selected model and active prompt
         try {
-          const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
+          const backendUrl =
+            process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
           // Find the model by display name that was selected
           let selectedModel = config?.models?.[0];
           if (config && config.models && selectedModelName) {
             selectedModel = config.models.find((m) => m.display_name === selectedModelName);
           }
           const modelId = selectedModel?.name || "gpt-4.1-nano";
+          const promptId = config?.active_prompt?.id;
+
+          const createBody: {
+            model_id: string;
+            title: string;
+            prompt_id?: string;
+          } = {
+            model_id: modelId,
+            title: title,
+          };
+          if (promptId) {
+            createBody.prompt_id = promptId;
+          }
 
           const createResponse = await fetch(`${backendUrl}/chat/sessions`, {
             method: "POST",
@@ -128,10 +172,7 @@ export const Assistant = () => {
               "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({
-              title: title,
-              model_id: modelId,
-            }),
+            body: JSON.stringify(createBody),
           });
 
           if (!createResponse.ok) {
@@ -162,6 +203,12 @@ export const Assistant = () => {
         requestBody.sessionId = sessionId;
       }
 
+      // DEBUG: Log token and request details
+      console.log("[Assistant] Sending message request:");
+      console.log("[Assistant] Token:", token ? `${token.substring(0, 20)}...` : "NO TOKEN");
+      console.log("[Assistant] SessionId:", sessionId);
+      console.log("[Assistant] Request body:", requestBody);
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -172,67 +219,70 @@ export const Assistant = () => {
         signal: abortSignal,
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
+      console.log("[Assistant] Response status:", response.status);
 
-      if (!response.body) {
-        throw new Error("No response body");
-      }
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.log("[Assistant] Error response:", errorText);
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+          }
 
-      // Parse SSE and stream content in real-time
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let text = "";
+          if (!response.body) {
+            throw new Error("No response body");
+          }
 
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+          // Parse SSE and stream content in real-time
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let text = "";
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
 
-          for (const line of lines) {
-            if (line.startsWith("data:")) {
-              const dataStr = line.slice(5).trim();
-              if (dataStr) {
-                try {
-                  const data = JSON.parse(dataStr);
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n");
+              buffer = lines.pop() || "";
 
-                  // Yield text-delta events immediately for real-time streaming
-                  if (data.type === "text-delta" && data.textDelta) {
-                    text += data.textDelta;
-                    yield {
-                      content: [
-                        {
-                          type: "text",
-                          text: text,
-                        },
-                      ],
-                    };
+              for (const line of lines) {
+                if (line.startsWith("data:")) {
+                  const dataStr = line.slice(5).trim();
+                  if (dataStr) {
+                    try {
+                      const data = JSON.parse(dataStr);
+
+                      // Yield text-delta events immediately for real-time streaming
+                      if (data.type === "text-delta" && data.textDelta) {
+                        text += data.textDelta;
+                        yield {
+                          content: [
+                            {
+                              type: "text",
+                              text: text,
+                            },
+                          ],
+                        };
+                      }
+
+                      // Handle finish event to complete streaming
+                      if (data.type === "finish") {
+                        console.log("[streaming] Finished, final text:", text);
+                        return; // Exit generator to signal completion
+                      }
+                    } catch {
+                      // Silently ignore parsing errors
+                    }
                   }
-
-                  // Handle finish event to complete streaming
-                  if (data.type === "finish") {
-                    console.log("[streaming] Finished, final text:", text);
-                    return;
-                  }
-                } catch {
-                  // Silently ignore parsing errors
                 }
               }
             }
+          } finally {
+            reader.releaseLock();
           }
-        }
-      } finally {
-        reader.releaseLock();
-      }
-    },
-  });
+        },
+      });
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
@@ -258,18 +308,19 @@ const AssistantContent = ({
 }: AssistantContentProps) => {
   const { threadId } = useCurrentThread();
   const { conversations } = useConversations();
-  const [modelName, setModelName] = useState<string>(selectedModelName);
   const [promptName, setPromptName] = useState<string>("-");
+  const [modelName, setModelName] = useState<string>(selectedModelName);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Get current conversation details
   const currentConversation = conversations.find((c) => c.id === threadId);
 
-  // Update model and prompt names based on thread context
+  // Update model name when at root (no threadId) - use selected model from parent
   useEffect(() => {
     if (!threadId) {
       setModelName(selectedModelName);
+      // Use active prompt name if available
       if (config?.active_prompt) {
         setPromptName(config.active_prompt.name);
       } else {
@@ -281,6 +332,7 @@ const AssistantContent = ({
   // When at a conversation, show conversation's model and prompt
   useEffect(() => {
     if (currentConversation && threadId) {
+      // Set model name from conversation (model_id is UUID)
       if (config && config.models) {
         const model = config.models.find((m) => m.id === currentConversation.model_id);
         setModelName(model?.display_name || "Unknown Model");
@@ -288,6 +340,7 @@ const AssistantContent = ({
         setModelName("Unknown Model");
       }
 
+      // Fetch prompt name from prompt_id
       if (currentConversation.prompt_id) {
         getPromptName(currentConversation.prompt_id).then((name) => {
           setPromptName(name || "-");
@@ -364,14 +417,13 @@ const AssistantContent = ({
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-            {/* User menu and theme toggle on the right */}
-            <div className="ml-auto flex items-center gap-2">
-              <UserMenu />
+            {/* Theme toggle on the right */}
+            <div className="ml-auto">
               <ThemeToggle />
             </div>
           </header>
           <div className="flex-1 overflow-hidden">
-            <Thread />
+            <ThreadWithHistory />
           </div>
         </SidebarInset>
       </div>
