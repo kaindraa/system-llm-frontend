@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import { useLocalRuntime } from "@assistant-ui/react";
-import { Thread } from "@/components/assistant-ui/thread";
+import { ThreadWithHistory } from "@/components/assistant-ui/thread-with-history";
 import {
   SidebarInset,
   SidebarProvider,
@@ -371,7 +371,7 @@ const AssistantContent = ({
             </div>
           </header>
           <div className="flex-1 overflow-hidden">
-            <Thread />
+            <ThreadWithHistory />
           </div>
         </SidebarInset>
       </div>

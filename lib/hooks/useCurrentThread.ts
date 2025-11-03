@@ -16,6 +16,7 @@ export const useCurrentThread = () => {
 
   // Load messages for the current thread
   const loadMessages = useCallback(async (conversationId: string) => {
+    console.log("[useCurrentThread] Loading messages for thread:", conversationId);
     setIsLoading(true);
     setError(null);
     // Don't clear messages - keep showing old ones while loading new ones to avoid flicker
@@ -43,27 +44,36 @@ export const useCurrentThread = () => {
       if (!response.ok) {
         // If conversation doesn't exist or is empty, just start fresh
         if (response.status === 404) {
+          console.log("[useCurrentThread] Conversation not found (404) - starting fresh");
           setMessages([]);
+          setError(null);
+          setIsLoading(false);
           return;
         }
         throw new Error(`Failed to load messages: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log("[useCurrentThread] Loaded conversation data, messages count:", data.messages?.length || 0);
 
-      // Transform backend messages to @assistant-ui format
-      if (data.messages && Array.isArray(data.messages)) {
+      // Transform backend messages to format
+      if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
         const formattedMessages = data.messages.map((msg: {
           role?: string;
           content?: string | Array<{ type?: string; text?: string }>
         }) => ({
-          role: msg.role || "user",
+          role: (msg.role || "user") as "user" | "assistant",
           content:
             typeof msg.content === "string"
               ? msg.content
-              : msg.content || "",
+              : Array.isArray(msg.content)
+              ? msg.content
+              : "",
         }));
         setMessages(formattedMessages);
+      } else {
+        console.log("[useCurrentThread] No messages found in conversation");
+        setMessages([]);
       }
     } catch (err) {
       console.error("[useCurrentThread] Error loading messages:", err);
@@ -77,16 +87,14 @@ export const useCurrentThread = () => {
   // Load messages when threadId changes
   useEffect(() => {
     if (threadId) {
-      // Only try to load if it looks like a real UUID (not a temp one)
-      // Real UUIDs from backend are typically 36 chars, temp ones generated locally also are
-      // But we can check: if it fails to load, just treat as new
-      loadMessages(threadId).catch(() => {
-        // If loading fails, treat as new conversation (temp ID)
-        setMessages([]);
-      });
+      console.log("[useCurrentThread] ThreadId changed to:", threadId);
+      loadMessages(threadId);
     } else {
+      console.log("[useCurrentThread] No threadId - clearing messages and state");
       // No thread selected, start with empty messages
       setMessages([]);
+      setIsLoading(false);
+      setError(null);
     }
   }, [threadId, loadMessages]);
 
