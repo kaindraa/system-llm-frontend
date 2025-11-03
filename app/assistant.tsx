@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { AssistantRuntimeProvider } from "@assistant-ui/react";
-import { useLocalRuntime } from "@assistant-ui/react";
-import { ThreadWithHistory } from "@/components/assistant-ui/thread-with-history";
+import { ChatContainer } from "@/components/assistant-ui/chat-container";
 import {
   SidebarInset,
   SidebarProvider,
@@ -20,12 +18,9 @@ import {
 } from "@/components/ui/breadcrumb";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { UserMenu } from "@/components/common/user-menu";
-import { initializeSession } from "@/lib/chat-transport";
 import { useCurrentThread } from "@/lib/hooks/useCurrentThread";
 import { useConversations } from "@/lib/hooks/useConversations";
-import { trimTitle } from "@/lib/utils";
 import { getPromptName } from "@/lib/services/conversation";
-import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 
 interface ConfigData {
@@ -34,15 +29,6 @@ interface ConfigData {
 }
 
 export const Assistant = () => {
-  // Initialize session from localStorage on mount
-  useEffect(() => {
-    initializeSession();
-  }, []);
-
-  const router = useRouter();
-  const { threadId } = useCurrentThread();
-  const { conversations, loadConversations } = useConversations();
-
   // Fetch config with models
   const [config, setConfig] = useState<ConfigData | null>(null);
   const [selectedModelName, setSelectedModelName] = useState<string>("GPT-4.1 Nano");
@@ -75,173 +61,12 @@ export const Assistant = () => {
     fetchConfig();
   }, []);
 
-  // Check if current threadId is a real conversation
-  const isRealThread = threadId && conversations.some((c) => c.id === threadId);
-
-  const runtime = useLocalRuntime({
-    async *run({ messages, abortSignal }) {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
-      if (!token) {
-        throw new Error("No authentication token");
-      }
-
-      let sessionId = threadId;
-
-      // If it's a new conversation (no threadId or not in conversations), create it first
-      if (!isRealThread && !threadId) {
-        console.log("[Assistant] Creating new conversation before sending message");
-
-        // Extract first user message as title
-        let title = "New Chat";
-        if (messages && messages.length > 0) {
-          const firstUserMessage = messages.find((msg: { role?: string }) => msg.role === "user");
-          if (firstUserMessage) {
-            let messageText = "";
-            if (typeof firstUserMessage.content === "string") {
-              messageText = firstUserMessage.content;
-            } else if (Array.isArray(firstUserMessage.content)) {
-              messageText = (firstUserMessage.content as Array<{ type: string; text?: string }>)
-                .filter((c) => c.type === "text")
-                .map((c) => c.text || "")
-                .join(" ");
-            }
-            if (messageText) {
-              title = trimTitle(messageText, 50);
-            }
-          }
-        }
-
-        // Create conversation
-        try {
-          const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
-          // Find the model by display name that was selected
-          let selectedModel = config?.models?.[0];
-          if (config && config.models && selectedModelName) {
-            selectedModel = config.models.find((m) => m.display_name === selectedModelName);
-          }
-          const modelId = selectedModel?.name || "gpt-4.1-nano";
-
-          const createResponse = await fetch(`${backendUrl}/chat/sessions`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              title: title,
-              model_id: modelId,
-            }),
-          });
-
-          if (!createResponse.ok) {
-            throw new Error("Failed to create conversation");
-          }
-
-          const sessionData = await createResponse.json();
-          sessionId = sessionData.id;
-          console.log("[Assistant] Conversation created:", sessionId);
-
-          // Navigate to new conversation
-          router.push(`/?thread=${sessionId}`);
-          loadConversations();
-        } catch (error) {
-          console.error("[Assistant] Failed to create conversation:", error);
-          throw error;
-        }
-      }
-
-      // Prepare request body for sending message
-      const requestBody: {
-        messages: typeof messages;
-        threadId?: string;
-        sessionId?: string;
-      } = { messages };
-      if (sessionId) {
-        requestBody.threadId = sessionId;
-        requestBody.sessionId = sessionId;
-      }
-
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(requestBody),
-        signal: abortSignal,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
-      if (!response.body) {
-        throw new Error("No response body");
-      }
-
-      // Parse SSE and stream content in real-time
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let text = "";
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            if (line.startsWith("data:")) {
-              const dataStr = line.slice(5).trim();
-              if (dataStr) {
-                try {
-                  const data = JSON.parse(dataStr);
-
-                  // Yield text-delta events immediately for real-time streaming
-                  if (data.type === "text-delta" && data.textDelta) {
-                    text += data.textDelta;
-                    yield {
-                      content: [
-                        {
-                          type: "text",
-                          text: text,
-                        },
-                      ],
-                    };
-                  }
-
-                  // Handle finish event to complete streaming
-                  if (data.type === "finish") {
-                    console.log("[streaming] Finished, final text:", text);
-                    return;
-                  }
-                } catch {
-                  // Silently ignore parsing errors
-                }
-              }
-            }
-          }
-        }
-      } finally {
-        reader.releaseLock();
-      }
-    },
-  });
-
   return (
-    <AssistantRuntimeProvider runtime={runtime}>
-      <AssistantContent
-        config={config}
-        selectedModelName={selectedModelName}
-        setSelectedModelName={setSelectedModelName}
-      />
-    </AssistantRuntimeProvider>
+    <AssistantContent
+      config={config}
+      selectedModelName={selectedModelName}
+      setSelectedModelName={setSelectedModelName}
+    />
   );
 };
 
@@ -371,7 +196,7 @@ const AssistantContent = ({
             </div>
           </header>
           <div className="flex-1 overflow-hidden">
-            <ThreadWithHistory />
+            <ChatContainer config={config} selectedModelName={selectedModelName} />
           </div>
         </SidebarInset>
       </div>
