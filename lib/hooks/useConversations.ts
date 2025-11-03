@@ -31,8 +31,11 @@ export function useConversations() {
 
   // Define loadConversations with useCallback
   const loadConversations = useCallback(async () => {
-    // Prevent duplicate fetches
-    if (loadingRef.current) return;
+    // Prevent duplicate fetches - but allow if explicitly called
+    if (loadingRef.current) {
+      console.log("[useConversations] Load already in progress, skipping");
+      return;
+    }
 
     loadingRef.current = true;
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
@@ -46,6 +49,7 @@ export function useConversations() {
         ...prev,
         conversations: data.sessions,
         isLoading: false,
+        error: null,
       }));
     } catch (error) {
       console.error("[useConversations] Error loading:", error);

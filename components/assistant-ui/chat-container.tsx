@@ -27,28 +27,54 @@ interface ChatContainerProps {
 export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps) => {
   const router = useRouter();
   const { threadId, messages: previousMessages, isLoading } = useCurrentThread();
-  const { conversations } = useConversations();
+  const { conversations, loadConversations } = useConversations();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isMountedRef = useRef(true);
+  const formRef = useRef<HTMLFormElement>(null);
 
-  // Update messages when previousMessages change (conversation switch)
+  // Init and cleanup
   useEffect(() => {
-    if (previousMessages && previousMessages.length > 0) {
-      setMessages(
-        previousMessages.map((msg) => ({
-          role: msg.role,
-          content: typeof msg.content === "string" ? msg.content : "",
-          created_at: new Date().toISOString(),
-        }))
-      );
-    } else {
+    console.log("[ChatContainer] Mounted");
+    isMountedRef.current = true;
+
+    // Ensure clean state on mount
+    setIsSending(false);
+    setIsStreaming(false);
+    setIsCreatingConversation(false);
+
+    return () => {
+      console.log("[ChatContainer] Unmounting, cleaning up");
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // When threadId changes, we need to handle message sync properly
+  useEffect(() => {
+    console.log("[ChatContainer] ThreadId effect triggered. threadId:", threadId);
+
+    // If no threadId, clear messages (new chat mode)
+    if (!threadId) {
+      console.log("[ChatContainer] No threadId, clearing local messages for new chat");
       setMessages([]);
+    } else if (previousMessages) {
+      // ThreadId exists, sync with backend messages
+      console.log("[ChatContainer] Loading messages for thread:", threadId, "message count:", previousMessages.length);
+      const syncedMessages = previousMessages.map((msg) => ({
+        role: msg.role,
+        content: typeof msg.content === "string" ? msg.content : "",
+        created_at: new Date().toISOString(),
+      }));
+      setMessages(syncedMessages);
+      console.log("[ChatContainer] Messages synced, count:", syncedMessages.length);
+    } else {
+      console.log("[ChatContainer] ThreadId exists but no previousMessages yet (still loading?)");
     }
-  }, [previousMessages, threadId]);
+  }, [threadId, previousMessages]);
 
   // Auto scroll to bottom
   const scrollToBottom = useCallback(() => {
@@ -62,13 +88,48 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!inputValue.trim()) {
+    console.log("[ChatContainer] handleSendMessage called. Current state:", {
+      isSending,
+      isCreatingConversation,
+      isStreaming,
+      threadId: threadId || "undefined",
+      inputLength: inputValue.length,
+    });
+
+    // Guard: prevent double submission
+    if (isSending || isCreatingConversation) {
+      console.warn("[ChatContainer] BLOCKED: Already sending/creating", {
+        isSending,
+        isCreatingConversation,
+      });
       return;
     }
 
-    // If no threadId, create conversation first
+    if (!inputValue.trim()) {
+      console.log("[ChatContainer] Empty input, ignoring");
+      return;
+    }
+
+    const messageContent = inputValue;
+
+    // Add user message immediately
+    const userMessage: Message = {
+      role: "user",
+      content: messageContent,
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInputValue("");
+    setIsSending(true);
+    setIsStreaming(true);
+
     let activeThreadId = threadId;
+    let navigateToThreadId: string | null = null;
+
+    // If no threadId, create conversation first
     if (!threadId) {
+      console.log("[ChatContainer] No threadId, need to create conversation first");
       setIsCreatingConversation(true);
       try {
         console.log("[ChatContainer] Creating new conversation");
@@ -80,10 +141,8 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
           throw new Error("No authentication token");
         }
 
-        // Extract title from first message
-        const title = inputValue.substring(0, 50);
+        const title = messageContent.substring(0, 50);
 
-        // Find selected model
         let modelId = "gpt-4.1-nano";
         if (config && config.models && selectedModelName) {
           const selectedModel = config.models.find(
@@ -113,11 +172,15 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
 
         const sessionData = await createResponse.json();
         activeThreadId = sessionData.id;
+        navigateToThreadId = sessionData.id;
 
-        console.log("[ChatContainer] Conversation created:", activeThreadId);
+        console.log("[ChatContainer] Conversation created with ID:", activeThreadId);
+        console.log("[ChatContainer] Will navigate to:", navigateToThreadId);
 
-        // Navigate to new conversation
-        router.push(`/?thread=${activeThreadId}`);
+        // Update sidebar
+        console.log("[ChatContainer] Reloading conversations...");
+        await loadConversations();
+        console.log("[ChatContainer] Conversations reloaded");
       } catch (error) {
         console.error("[ChatContainer] Error creating conversation:", error);
         setMessages((prev) => [
@@ -131,24 +194,16 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
             created_at: new Date().toISOString(),
           },
         ]);
+        // Reset all state properly
+        setIsSending(false);
+        setIsStreaming(false);
         setIsCreatingConversation(false);
         return;
       } finally {
+        // Ensure state is reset
         setIsCreatingConversation(false);
       }
     }
-
-    const userMessage: Message = {
-      role: "user",
-      content: inputValue,
-      created_at: new Date().toISOString(),
-    };
-
-    // Add user message immediately
-    setMessages((prev) => [...prev, userMessage]);
-    setInputValue("");
-    setIsSending(true);
-    setIsStreaming(true);
 
     try {
       const token =
@@ -181,24 +236,35 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
         throw new Error("No response body");
       }
 
-      // Parse streaming response
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let assistantContent = "";
-
-      // Add empty assistant message to show it's typing
-      let assistantMessage: Message = {
+      // Add empty assistant message
+      const assistantMessage: Message = {
         role: "assistant",
         content: "",
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, assistantMessage]);
 
+      // Parse streaming response
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let assistantContent = "";
+
       try {
-        while (true) {
+        let streamFinished = false;
+        while (!streamFinished) {
+          console.log("[ChatContainer] Waiting for stream chunk...");
           const { done, value } = await reader.read();
-          if (done) break;
+
+          if (done) {
+            console.log("[ChatContainer] Stream done (done=true)");
+            break;
+          }
+
+          if (!value) {
+            console.log("[ChatContainer] No value, continuing...");
+            continue;
+          }
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
@@ -211,11 +277,9 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
                 try {
                   const data = JSON.parse(dataStr);
 
-                  // Handle text-delta events (streaming chunks)
                   if (data.type === "text-delta" && data.textDelta) {
                     assistantContent += data.textDelta;
 
-                    // Update assistant message in real-time
                     setMessages((prev) => {
                       const updated = [...prev];
                       updated[updated.length - 1] = {
@@ -226,25 +290,34 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
                     });
                   }
 
-                  // Handle finish event
                   if (data.type === "finish") {
-                    console.log("[ChatContainer] Streaming finished");
+                    console.log("[ChatContainer] Received finish event");
+                    streamFinished = true;
                     setIsStreaming(false);
+                    break;
                   }
-                } catch {
-                  // Silently ignore parsing errors
+                } catch (parseError) {
+                  console.log("[ChatContainer] JSON parse error (ignored):", parseError);
                 }
               }
             }
           }
+
+          if (streamFinished) break;
         }
+        console.log("[ChatContainer] Streaming loop completed successfully");
       } finally {
+        console.log("[ChatContainer] Releasing reader lock");
         reader.releaseLock();
-        setIsStreaming(false);
+        console.log("[ChatContainer] Reader lock released, exiting stream handler");
       }
     } catch (error) {
-      console.error("[ChatContainer] Error sending message:", error);
-      // Add error message
+      console.error("[ChatContainer] ERROR in send message block:", error);
+      console.error("[ChatContainer] Error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
       setMessages((prev) => [
         ...prev,
         {
@@ -257,7 +330,61 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
         },
       ]);
     } finally {
+      console.log("[ChatContainer] Finally block - cleanup and reset");
+
+      // CRITICAL: Reset all sending states
+      console.log("[ChatContainer] Resetting isSending...");
       setIsSending(false);
+
+      console.log("[ChatContainer] Resetting isStreaming...");
+      setIsStreaming(false);
+
+      // Log final state
+      console.log("[ChatContainer] State reset complete. Final state:", {
+        isSending: false,
+        isStreaming: false,
+        navigateToThreadId,
+      });
+
+      // Navigate AFTER everything is done
+      if (navigateToThreadId) {
+        console.log("[ChatContainer] NAVIGATING to new conversation:", navigateToThreadId);
+        console.log("[ChatContainer] Current URL before navigation:", window.location.href);
+
+        if (isMountedRef.current) {
+          router.push(`/?thread=${navigateToThreadId}`);
+          console.log("[ChatContainer] router.push called successfully");
+        } else {
+          console.log("[ChatContainer] ERROR: Component unmounted, cannot navigate");
+        }
+      } else {
+        console.log("[ChatContainer] No navigation needed (threaded message)");
+      }
+    }
+  };
+
+  // Handle Enter/Shift+Enter keybinding
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter") {
+      if (e.shiftKey) {
+        // Shift+Enter = newline (default behavior)
+        return true;
+      } else {
+        // Enter = send message
+        e.preventDefault();
+        e.stopPropagation();
+
+        console.log("[ChatContainer] Enter pressed");
+
+        if (!isSending && !isCreatingConversation && inputValue.trim()) {
+          console.log("[ChatContainer] Sending message via Enter key");
+          // Submit the form using requestSubmit to trigger proper onSubmit handler
+          formRef.current?.requestSubmit();
+          return false;
+        }
+
+        return false;
+      }
     }
   };
 
@@ -295,11 +422,12 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
 
       {/* Input area */}
       <div className="aui-chat-input-wrapper border-t px-4 py-4">
-        <form onSubmit={handleSendMessage} className="flex gap-2">
+        <form ref={formRef} onSubmit={handleSendMessage} className="flex gap-2">
           <textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Send a message..."
+            onKeyDown={handleKeyDown}
+            placeholder="Send a message... (Shift+Enter for newline)"
             className={cn(
               "flex-1 rounded-lg border border-input bg-background px-4 py-2 text-sm",
               "placeholder:text-muted-foreground",
@@ -307,7 +435,7 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
               "resize-none"
             )}
             rows={2}
-            disabled={isSending || isCreatingConversation}
+            autoFocus
           />
           <Button
             type="submit"
