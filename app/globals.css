@@ -129,4 +129,29 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* KaTeX styling for dark mode */
+  .katex {
+    font-size: 1em;
+    color: var(--foreground);
+  }
+
+  .katex-html {
+    display: inline;
+  }
+
+  .dark .katex {
+    color: var(--foreground);
+  }
+
+  /* Display math (block) */
+  .katex-display {
+    margin: 1em 0;
+    padding: 0.5em 0;
+  }
+
+  /* Inline math */
+  .katex {
+    margin: 0 0.125em;
+  }
 }

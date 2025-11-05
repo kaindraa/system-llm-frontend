@@ -7,6 +7,7 @@ import { useConversations } from "@/lib/hooks/useConversations";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SendIcon } from "lucide-react";
+import { MarkdownRenderer } from "@/components/assistant-ui/markdown-renderer";
 
 interface Message {
   role: "user" | "assistant";
@@ -445,7 +446,13 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
             : "bg-secondary text-secondary-foreground"
         )}
       >
-        <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+        {isUser ? (
+          <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+        ) : (
+          <div className="text-sm">
+            <MarkdownRenderer>{message.content}</MarkdownRenderer>
+          </div>
+        )}
       </div>
     </div>
   );
