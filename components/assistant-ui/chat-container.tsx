@@ -6,8 +6,9 @@ import { useCurrentThread } from "@/lib/hooks/useCurrentThread";
 import { useConversations } from "@/lib/hooks/useConversations";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { SendIcon } from "lucide-react";
+import { SendIcon, MenuIcon } from "lucide-react";
 import { MarkdownRenderer } from "@/components/assistant-ui/markdown-renderer";
+import { DocumentSidebar } from "@/components/assistant-ui/document-sidebar";
 
 interface Message {
   role: "user" | "assistant";
@@ -34,6 +35,7 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
   const [isSending, setIsSending] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMountedRef = useRef(true);
   const formRef = useRef<HTMLFormElement>(null);
@@ -366,9 +368,23 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
   };
 
   return (
-    <div className="aui-root aui-chat-container flex h-full w-full flex-col bg-background">
-      {/* Messages viewport */}
-      <div className="aui-chat-viewport flex flex-1 flex-col overflow-y-auto px-4 py-4">
+    <div className="aui-root aui-chat-container flex h-full w-full bg-background">
+      {/* Main chat area */}
+      <div className="flex flex-1 flex-col min-w-0">
+        {/* Header with sidebar toggle */}
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border lg:hidden">
+          <span className="text-sm font-medium">Chat</span>
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
+            aria-label="Toggle documents sidebar"
+          >
+            <MenuIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Messages viewport */}
+        <div className="aui-chat-viewport flex flex-1 flex-col overflow-y-auto px-4 py-4">
         {/* Loading indicator */}
         {isLoading && messages.length === 0 && (
           <div className="flex items-center justify-center py-8">
@@ -397,32 +413,39 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input area */}
-      <div className="aui-chat-input-wrapper border-t px-4 py-4">
-        <form ref={formRef} onSubmit={handleSendMessage} className="flex gap-2">
-          <textarea
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Send a message... (Shift+Enter for newline)"
-            className={cn(
-              "flex-1 rounded-lg border border-input bg-background px-4 py-2 text-sm",
-              "placeholder:text-muted-foreground",
-              "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background",
-              "resize-none"
-            )}
-            rows={2}
-            autoFocus
-          />
-          <Button
-            type="submit"
-            disabled={!inputValue.trim() || isSending || isCreatingConversation}
-            className="self-end"
-          >
-            <SendIcon className="h-4 w-4" />
-          </Button>
-        </form>
+        {/* Input area */}
+        <div className="aui-chat-input-wrapper border-t px-4 py-4">
+          <form ref={formRef} onSubmit={handleSendMessage} className="flex gap-2">
+            <textarea
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Send a message... (Shift+Enter for newline)"
+              className={cn(
+                "flex-1 rounded-lg border border-input bg-background px-4 py-2 text-sm",
+                "placeholder:text-muted-foreground",
+                "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background",
+                "resize-none"
+              )}
+              rows={2}
+              autoFocus
+            />
+            <Button
+              type="submit"
+              disabled={!inputValue.trim() || isSending || isCreatingConversation}
+              className="self-end"
+            >
+              <SendIcon className="h-4 w-4" />
+            </Button>
+          </form>
+        </div>
       </div>
+
+      {/* Document Sidebar */}
+      <DocumentSidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
     </div>
   );
 };
