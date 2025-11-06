@@ -37,6 +37,7 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const isMountedRef = useRef(true);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -79,9 +80,12 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
     }
   }, [threadId, previousMessages]);
 
-  // Auto scroll to bottom
+  // Auto scroll to bottom - only scroll the chat viewport, not the page
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (viewportRef.current) {
+      // Scroll only the chat viewport container to bottom
+      viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
+    }
   }, []);
 
   useEffect(() => {
@@ -384,7 +388,10 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
         </div>
 
         {/* Messages viewport */}
-        <div className="aui-chat-viewport flex flex-1 flex-col overflow-y-auto px-4 py-4">
+        <div
+          ref={viewportRef}
+          className="aui-chat-viewport flex flex-1 flex-col overflow-y-auto px-4 py-4"
+        >
         {/* Loading indicator */}
         {isLoading && messages.length === 0 && (
           <div className="flex items-center justify-center py-8">
