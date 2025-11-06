@@ -118,6 +118,11 @@
     @apply border-border outline-ring/50;
   }
 
+  html {
+    height: 100%;
+    overflow: hidden;
+  }
+
   :root {
     color-scheme: light;
   }
@@ -128,6 +133,10 @@
 
   body {
     @apply bg-background text-foreground;
+    height: 100%;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
   }
 
   /* KaTeX styling for dark mode */

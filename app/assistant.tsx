@@ -195,7 +195,7 @@ const AssistantContent = ({
               <ThemeToggle />
             </div>
           </header>
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden flex">
             <ChatContainer config={config} selectedModelName={selectedModelName} />
           </div>
         </SidebarInset>

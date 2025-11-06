@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Loader2, AlertCircle, Download } from "lucide-react";
+import { X, Loader2, AlertCircle, Download, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { documentService, type DocumentResponse } from "@/lib/services/document";
+import { Button } from "@/components/ui/button";
 
 interface DocumentSidebarProps {
   isOpen: boolean;
@@ -27,13 +28,10 @@ export const DocumentSidebar = ({
         console.log("[DocumentSidebar] Mounting, fetching documents...");
         setIsLoading(true);
         setError(null);
-        // Fetch all documents regardless of status (like admin page does)
-        // API limit max 100 per request
         const response = await documentService.listDocuments(0, 100);
 
         console.log("[DocumentSidebar] Response:", response);
 
-        // Safely handle response
         const docs = response?.items || [];
         console.log("[DocumentSidebar] Parsed documents:", docs);
 
@@ -96,6 +94,34 @@ export const DocumentSidebar = ({
     });
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "processed":
+        return "bg-green-500";
+      case "processing":
+        return "bg-yellow-500";
+      case "failed":
+        return "bg-red-500";
+      default:
+        return "bg-gray-500";
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "processed":
+        return "✅ Processed";
+      case "processing":
+        return "⏳ Processing";
+      case "failed":
+        return "❌ Failed";
+      case "uploaded":
+        return "📤 Uploaded";
+      default:
+        return status;
+    }
+  };
+
   return (
     <>
       {/* Overlay for mobile */}
@@ -106,66 +132,70 @@ export const DocumentSidebar = ({
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - Desktop static positioning, Mobile fixed */}
       <div
         className={cn(
-          "fixed lg:static inset-y-0 right-0 w-full sm:w-96 bg-background border-l border-border z-40",
-          "flex flex-col transition-transform duration-300 ease-out",
+          "w-full sm:w-96 bg-background border-l border-border",
+          "flex flex-col h-full",
+          // Desktop: static, part of flex layout
+          "lg:flex-shrink-0 lg:h-auto",
+          // Mobile: fixed, transforms off-screen
+          "fixed lg:static right-0 top-0 bottom-0 z-40 lg:z-auto transition-transform duration-300 ease-out",
           "lg:translate-x-0",
           isOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
         )}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        {/* Header - Only on Mobile */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0 lg:hidden">
           <h2 className="font-semibold text-lg">📚 Documents</h2>
           <button
             onClick={onClose}
-            className="lg:hidden p-2 hover:bg-muted rounded-lg transition-colors"
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
             aria-label="Close sidebar"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto flex flex-col">
-          {/* Loading state */}
+        {/* Content - Main scrollable section (like SidebarContent) */}
+        <div
+          className="flex-1 overflow-auto min-h-0 flex flex-col"
+          data-testid="document-sidebar-main-scroll"
+          style={{
+            scrollbarWidth: "thin",
+            scrollbarColor: "rgba(255, 0, 0, 0.5) transparent" // Red scrollbar untuk visible
+          }}
+        >
+          {/* Loading State */}
           {isLoading && (
-            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground flex-1">
               <Loader2 className="h-6 w-6 animate-spin mb-2" />
               <p className="text-sm">Loading documents...</p>
             </div>
           )}
 
-          {/* Error state */}
+          {/* Error State */}
           {error && (
-            <div className="mx-4 mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 flex gap-2">
-              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
+            <div className="m-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 flex gap-2 flex-shrink-0">
+              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
               <p className="text-sm text-destructive">{error}</p>
             </div>
           )}
 
-          {/* Empty state */}
+          {/* Empty State */}
           {!isLoading && !error && documents.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground px-4">
-              <p className="text-sm">📭 No documents uploaded yet</p>
-              <p className="text-xs mt-2">Upload documents via admin panel at:</p>
-              <p className="text-xs font-mono bg-muted px-2 py-1 rounded mt-2 w-full text-center overflow-x-auto">
-                /admin
-              </p>
-              <p className="text-xs mt-3 text-center">
-                Check browser console (F12) for API response details
-              </p>
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground px-4 flex-1">
+              <FileText className="h-12 w-12 mb-3 opacity-50" />
+              <p className="text-sm font-medium">No documents available</p>
+              <p className="text-xs mt-1">Contact admin to upload files</p>
             </div>
           )}
 
-          {/* Document List */}
+          {/* Documents List Section */}
           {!isLoading && documents.length > 0 && (
-            <div className="px-4 py-4 border-b border-border">
-              <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
-                Available Documents ({documents.length})
-              </h3>
-              <div className="space-y-2">
+            <>
+              {/* Section: Documents List */}
+              <div className="flex flex-col gap-1 p-3 flex-shrink-0">
                 {documents.map((doc) => (
                   <button
                     key={doc.id}
@@ -178,129 +208,140 @@ export const DocumentSidebar = ({
                         : "bg-muted hover:bg-muted/80"
                     )}
                   >
-                    <div className="text-sm font-medium truncate">
-                      {doc.original_filename}
-                    </div>
-                    <div
-                      className={cn(
-                        "text-xs truncate mt-1",
-                        selectedId === doc.id
-                          ? "text-primary-foreground/80"
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      {formatFileSize(doc.file_size)}
-                    </div>
-                    <div
-                      className={cn(
-                        "text-xs mt-1 flex items-center gap-1",
-                        selectedId === doc.id
-                          ? "text-primary-foreground/70"
-                          : "text-muted-foreground/70"
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "inline-block w-2 h-2 rounded-full",
-                          doc.status === "processed"
-                            ? "bg-green-500"
-                            : doc.status === "processing"
-                              ? "bg-yellow-500"
-                              : doc.status === "failed"
-                                ? "bg-red-500"
-                                : "bg-gray-500"
-                        )}
-                      />
-                      {doc.status}
+                    <div className="flex items-start gap-2">
+                      <FileText className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">
+                          {doc.original_filename}
+                        </div>
+                        <div
+                          className={cn(
+                            "text-xs mt-1 flex items-center gap-1",
+                            selectedId === doc.id
+                              ? "text-primary-foreground/70"
+                              : "text-muted-foreground/70"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "inline-block w-2 h-2 rounded-full",
+                              getStatusColor(doc.status)
+                            )}
+                          />
+                          {formatFileSize(doc.file_size)}
+                        </div>
+                      </div>
                     </div>
                   </button>
                 ))}
               </div>
-            </div>
-          )}
 
-          {/* Document Preview */}
-          {!isLoading && selectedDoc && (
-            <div className="flex-1 px-4 py-4 overflow-hidden">
-              <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
-                Preview
-              </h3>
-              <div className="flex flex-col h-full bg-muted/50 rounded-lg border border-border p-4 overflow-hidden">
-                {/* Preview Header */}
-                <div className="mb-3 pb-3 border-b border-border">
-                  <h4 className="font-semibold text-sm break-words">
-                    {selectedDoc.original_filename}
-                  </h4>
-                  <div className="text-xs text-muted-foreground mt-2 space-y-1">
-                    <p>📦 Size: {formatFileSize(selectedDoc.file_size)}</p>
-                    <p>📅 Uploaded: {formatDate(selectedDoc.uploaded_at)}</p>
-                    <p
-                      className={cn(
-                        "inline-flex items-center gap-1",
-                        selectedDoc.status === "processed"
-                          ? "text-green-600 dark:text-green-400"
-                          : selectedDoc.status === "processing"
-                            ? "text-yellow-600 dark:text-yellow-400"
-                            : selectedDoc.status === "failed"
-                              ? "text-red-600 dark:text-red-400"
-                              : "text-gray-600"
+              {/* Divider */}
+              {selectedDoc && (
+                <div className="h-px bg-border flex-shrink-0" />
+              )}
+
+              {/* Section: Document Preview */}
+              {selectedDoc && (
+                <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                  {/* Preview Header */}
+                  <div className="px-4 py-3 border-b border-border flex-shrink-0">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      Preview
+                    </h3>
+                  </div>
+
+                  {/* Preview Content */}
+                  <div
+                    className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3"
+                    data-testid="document-sidebar-preview-scroll"
+                    style={{
+                      scrollbarGutter: "stable",
+                      scrollbarWidth: "thin",
+                      scrollbarColor: "rgba(0, 255, 0, 0.5) transparent" // Green scrollbar untuk visible
+                    }}
+                  >
+                    {/* File Name */}
+                    <div>
+                      <p className="text-sm font-semibold break-words">
+                        {selectedDoc.original_filename}
+                      </p>
+                    </div>
+
+                    {/* File Info */}
+                    <div className="space-y-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Size:</span>
+                        <span>{formatFileSize(selectedDoc.file_size)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Uploaded:</span>
+                        <span>{formatDate(selectedDoc.uploaded_at)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Status:</span>
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                            selectedDoc.status === "processed"
+                              ? "bg-green-500/20 text-green-700 dark:text-green-400"
+                              : selectedDoc.status === "processing"
+                                ? "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400"
+                                : selectedDoc.status === "failed"
+                                  ? "bg-red-500/20 text-red-700 dark:text-red-400"
+                                  : "bg-gray-500/20 text-gray-700 dark:text-gray-400"
+                          )}
+                        >
+                          {getStatusLabel(selectedDoc.status)}
+                        </span>
+                      </div>
+                      {selectedDoc.processed_at && (
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Processed:</span>
+                          <span>{formatDate(selectedDoc.processed_at)}</span>
+                        </div>
                       )}
+                    </div>
+
+                    {/* Divider */}
+                    <div className="h-px bg-border my-1" />
+
+                    {/* Type */}
+                    <div className="text-xs text-muted-foreground">
+                      <span className="font-medium">Type:</span> {selectedDoc.mime_type}
+                    </div>
+                  </div>
+
+                  {/* Download Button */}
+                  <div className="px-4 py-3 border-t border-border flex-shrink-0">
+                    <Button
+                      onClick={handleDownload}
+                      disabled={isDownloading}
+                      className="w-full"
+                      size="sm"
                     >
-                      <span
-                        className={cn(
-                          "inline-block w-2 h-2 rounded-full",
-                          selectedDoc.status === "processed"
-                            ? "bg-green-500"
-                            : selectedDoc.status === "processing"
-                              ? "bg-yellow-500"
-                              : selectedDoc.status === "failed"
-                                ? "bg-red-500"
-                                : "bg-gray-500"
-                        )}
-                      />
-                      Status: {selectedDoc.status}
-                    </p>
+                      {isDownloading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          Downloading...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="h-4 w-4 mr-2" />
+                          Download
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
-
-                {/* Download button */}
-                <div className="mb-3">
-                  <button
-                    onClick={handleDownload}
-                    disabled={isDownloading}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
-                  >
-                    {isDownloading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Downloading...
-                      </>
-                    ) : (
-                      <>
-                        <Download className="h-4 w-4" />
-                        Download
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Document Info */}
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <p>📄 Type: {selectedDoc.mime_type}</p>
-                  {selectedDoc.processed_at && (
-                    <p>
-                      ✅ Processed: {formatDate(selectedDoc.processed_at)}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+              )}
+            </>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-4 py-3 border-t border-border bg-muted/50 text-xs text-muted-foreground">
-          📖 Total: {documents.length} document{documents.length !== 1 ? "s" : ""}
+        {/* Footer - Fixed */}
+        <div className="px-4 py-3 border-t border-border bg-muted/50 text-xs text-muted-foreground flex-shrink-0">
+          📖 {documents.length} document{documents.length !== 1 ? "s" : ""}
         </div>
       </div>
     </>

@@ -368,7 +368,7 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
   };
 
   return (
-    <div className="aui-root aui-chat-container flex h-full w-full bg-background">
+    <div className="aui-root aui-chat-container flex h-full w-full bg-background flex-1 min-w-0 overflow-hidden">
       {/* Main chat area */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Header with sidebar toggle */}
