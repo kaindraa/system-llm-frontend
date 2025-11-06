@@ -126,8 +126,8 @@ export const documentService = {
     }
   },
 
-  // Download document
-  async downloadDocument(fileId: string): Promise<void> {
+  // Get document as Blob (for viewing)
+  async downloadDocument(fileId: string): Promise<Blob> {
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
@@ -145,17 +145,27 @@ export const documentService = {
         }
       );
 
-      // Create download link
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      return response.data;
+    } catch (error) {
+      console.error("[DocumentService] Error downloading document:", error);
+      throw error;
+    }
+  },
+
+  // Download and trigger browser download
+  async downloadDocumentAsFile(fileId: string, filename: string = "document"): Promise<void> {
+    try {
+      const blob = await this.downloadDocument(fileId);
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `document.pdf`);
+      link.setAttribute("download", filename);
       document.body.appendChild(link);
       link.click();
       link.parentElement?.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("[DocumentService] Error downloading document:", error);
+      console.error("[DocumentService] Error downloading document as file:", error);
       throw error;
     }
   },
