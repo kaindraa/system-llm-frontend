@@ -4,7 +4,7 @@ import type { FC } from "react";
 import { useRef, useEffect, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { useRouter } from "next/navigation";
-import { ChevronDown, LogOut, Settings } from "lucide-react";
+import { ChevronDown, LogOut, Settings, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const UserMenu: FC = () => {
@@ -34,6 +34,11 @@ export const UserMenu: FC = () => {
 
   const handleLogout = () => {
     logout();
+  };
+
+  const handleProfile = () => {
+    router.push("/profile");
+    setIsOpen(false);
   };
 
   const handleSettings = () => {
@@ -74,6 +79,15 @@ export const UserMenu: FC = () => {
 
           {/* Menu Items */}
           <div className="py-1">
+            {/* Profile Item */}
+            <button
+              onClick={handleProfile}
+              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+            >
+              <User className="h-4 w-4" />
+              <span>Profile</span>
+            </button>
+
             {/* Settings Item */}
             <button
               onClick={handleSettings}
