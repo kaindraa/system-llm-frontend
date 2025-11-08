@@ -38,29 +38,21 @@ export const RAGSourceBadges = ({
 
   console.log("[RAGSourceBadges] Raw sources:", sources);
 
-  // Remove duplicates by document_id and ensure all required fields are present
-  const uniqueSources = Array.from(
-    new Map(
-      sources
-        .filter((s) => {
-          const isValid = s && (s.document_id || s.document_name);
-          if (!isValid) console.log("[RAGSourceBadges] Filtering out invalid source:", s);
-          return isValid;
-        })
-        .map((s) => {
-          const normalized = {
-            ...s,
-            document_id: s.document_id || s.id || "",
-            document_name: s.document_name || s.filename || "Document",
-            page_number: Number(s.page_number ?? s.page ?? 1),
-          };
-          console.log("[RAGSourceBadges] Normalized source:", normalized);
-          return [normalized.document_id, normalized];
-        })
-    ).values()
-  );
+  // Normalize all sources (don't deduplicate - show all chunks)
+  const normalizedSources = sources
+    .filter((s) => {
+      const isValid = s && (s.document_id || s.document_name);
+      if (!isValid) console.log("[RAGSourceBadges] Filtering out invalid source:", s);
+      return isValid;
+    })
+    .map((s) => ({
+      ...s,
+      document_id: s.document_id || s.id || "",
+      document_name: s.document_name || s.filename || "Document",
+      page_number: Number(s.page_number ?? s.page ?? 1),
+    }));
 
-  console.log("[RAGSourceBadges] Final unique sources count:", uniqueSources.length);
+  console.log("[RAGSourceBadges] Total normalized sources (all chunks):", normalizedSources.length);
 
   return (
     <div
@@ -69,7 +61,7 @@ export const RAGSourceBadges = ({
         className
       )}
     >
-      {uniqueSources.map((source) => (
+      {normalizedSources.map((source, idx) => (
         <button
           key={`${source.document_id}-${source.page_number}`}
           onClick={() => onSourceClick?.(source.document_id, source.page_number || 1)}
@@ -104,7 +96,7 @@ export const RAGSourceBadges = ({
 
       {/* Info text */}
       <div className="w-full text-xs text-muted-foreground mt-1">
-        {uniqueSources.length} document{uniqueSources.length !== 1 ? "s" : ""} retrieved from RAG search
+        {normalizedSources.length} chunk{normalizedSources.length !== 1 ? "s" : ""} retrieved from RAG search
       </div>
     </div>
   );
