@@ -3,7 +3,7 @@
 import type { FC } from "react";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { TrashIcon, PlusIcon, MessageSquare, RefreshCwIcon } from "lucide-react";
+import { PlusIcon, RefreshCwIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -207,7 +207,7 @@ const ThreadListItem: FC<ThreadListItemProps> = ({
   return (
     <div
       className={cn(
-        "aui-thread-list-item group flex items-center gap-2 rounded-lg px-3 py-2 transition-colors",
+        "aui-thread-list-item group flex items-center gap-2 rounded-lg px-3 py-2 transition-colors min-w-0",
         "hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
         isActive && "bg-muted"
       )}
@@ -215,22 +215,12 @@ const ThreadListItem: FC<ThreadListItemProps> = ({
       {/* Conversation title button */}
       <button
         onClick={handleNavigate}
-        className="aui-thread-list-item-trigger flex-grow flex items-center gap-2 text-start"
+        className="aui-thread-list-item-trigger flex-grow flex items-center gap-2 text-start min-w-0"
+        title={conversation.title || "Untitled"}
       >
-        <MessageSquare className="h-4 w-4 text-muted-foreground group-hover:text-foreground flex-shrink-0" />
-        <span className="aui-thread-list-item-title text-sm truncate">
+        <span className="aui-thread-list-item-title text-sm break-words line-clamp-2 flex-grow">
           {conversation.title || "Untitled"}
         </span>
-      </button>
-
-      {/* Delete button */}
-      <button
-        onClick={handleDelete}
-        className="ml-auto p-1 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
-        aria-label="Delete conversation"
-        title="Delete"
-      >
-        <TrashIcon className="h-4 w-4" />
       </button>
     </div>
   );
