@@ -8,11 +8,15 @@ import { documentService, type DocumentResponse } from "@/lib/services/document"
 interface DocumentViewerProps {
   document: DocumentResponse | null;
   isLoading?: boolean;
+  pageNumber?: number;
+  onSourceSelect?: (docId: string, pageNumber: number) => void;
 }
 
 export const DocumentViewer: FC<DocumentViewerProps> = ({
   document,
   isLoading = false,
+  pageNumber = 1,
+  onSourceSelect,
 }) => {
   const [fileUrl, setFileUrl] = useState<string>("");
   const [isPdfLoading, setIsPdfLoading] = useState(false);
@@ -27,6 +31,7 @@ export const DocumentViewer: FC<DocumentViewerProps> = ({
         id: document.id,
         filename: document.original_filename,
         mimeType: document.mime_type,
+        pageNumber,
       });
 
       // Fetch file as blob and create object URL
@@ -93,9 +98,10 @@ export const DocumentViewer: FC<DocumentViewerProps> = ({
         </div>
       ) : fileUrl ? (
         <iframe
-          src={fileUrl}
+          src={`${fileUrl}#page=${pageNumber}`}
           className="h-full w-full border-0 flex-1"
           title={document.original_filename}
+          key={`${document.id}-${pageNumber}`}
         />
       ) : null}
     </div>

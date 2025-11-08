@@ -44,6 +44,7 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loadingStage, setLoadingStage] = useState<"idle" | "analyzing" | "searching" | "found" | "streaming">("idle");
+  const [selectedSourceDoc, setSelectedSourceDoc] = useState<{ docId: string; pageNumber: number } | null>(null);
   const [ragSearchState, setRagSearchState] = useState<RAGSearchState>({
     isSearching: false,
   });
@@ -92,6 +93,13 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
       console.log("[ChatContainer] ThreadId exists but no previousMessages yet (still loading?)");
     }
   }, [threadId, previousMessages]);
+
+  // Handle source badge click - open sidebar and navigate to document
+  const handleSourceClick = useCallback((docId: string, pageNumber: number) => {
+    console.log("[ChatContainer] Source clicked:", { docId, pageNumber });
+    setSelectedSourceDoc({ docId, pageNumber });
+    setSidebarOpen(true); // Open sidebar when source is clicked
+  }, []);
 
   // Auto scroll to bottom - only scroll the chat viewport, not the page
   const scrollToBottom = useCallback(() => {
@@ -407,14 +415,20 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
                   // Handle done event with sources
                   if (data.type === "done") {
                     console.log("[ChatContainer] ✅ DONE event received!");
+                    console.log("[ChatContainer] Done event data:", data);
+                    console.log("[ChatContainer] data.sources:", data.sources);
                     // Extract sources from response if available
                     if (data.sources && Array.isArray(data.sources)) {
+                      console.log("[ChatContainer] Processing", data.sources.length, "sources from done event");
                       currentSources = data.sources.map((src: any) => ({
-                        document_id: src.document_id,
-                        document_name: src.filename || src.document_name,
-                        page_number: src.page || src.page_number,
-                        similarity_score: src.similarity_score || 0.85,
+                        document_id: src.document_id || "",
+                        document_name: src.document_name || src.filename || "Document",
+                        page_number: Number(src.page_number ?? src.page ?? 1),
+                        similarity_score: Number(src.similarity_score ?? 0.85),
                       }));
+                      console.log("[ChatContainer] Mapped sources:", currentSources);
+                    } else {
+                      console.log("[ChatContainer] No sources in done event or sources is not array");
                     }
 
                     // Update final message with sources
@@ -584,6 +598,7 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
                   isStreaming={isStreaming && isLastMsg && isAssistant}
                   loadingStage={isLastMsg && isAssistant ? loadingStage : "idle"}
                   ragSearchState={isLastMsg && isAssistant ? ragSearchState : undefined}
+                  onSourceClick={handleSourceClick}
                 />
 
                 {/* Streaming cursor - shows below bubble while streaming */}
@@ -616,6 +631,8 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
       <DocumentSidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        selectedSourceDoc={selectedSourceDoc}
+        onSourceSelected={() => setSelectedSourceDoc(null)}
       />
     </div>
   );
@@ -627,13 +644,15 @@ interface MessageBubbleProps {
   hideSourceBadges?: boolean;
   loadingStage?: "idle" | "analyzing" | "searching" | "found" | "streaming";
   ragSearchState?: RAGSearchState;
+  onSourceClick?: (docId: string, pageNumber: number) => void;
 }
 
 const MessageBubbleComponent = ({
   message,
   isStreaming = false,
   loadingStage = "idle",
-  ragSearchState
+  ragSearchState,
+  onSourceClick
 }: Omit<MessageBubbleProps, 'hideSourceBadges'>) => {
   const isUser = message.role === "user";
   // Show indicator saat searching/found stage, atau jika message already has ragSearched flag
@@ -687,7 +706,11 @@ const MessageBubbleComponent = ({
         {/* Source Badges - shown INSIDE bubble at bottom */}
         {!isUser && message.sources && message.sources.length > 0 && (
           <div className="pt-2 border-t border-current/20">
-            <RAGSourceBadges sources={message.sources} className="text-xs" />
+            <RAGSourceBadges
+              sources={message.sources}
+              className="text-xs"
+              onSourceClick={onSourceClick}
+            />
           </div>
         )}
       </div>

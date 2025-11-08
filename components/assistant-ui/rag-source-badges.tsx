@@ -11,19 +11,18 @@ interface RAGSourceBadgesProps {
   /** Optional className for container styling */
   className?: string;
 
-  /** Callback when a source is clicked */
-  onSourceClick?: (source: RAGSource) => void;
+  /** Callback when a source is clicked - receives document ID and page number */
+  onSourceClick?: (docId: string, pageNumber: number) => void;
 }
 
 /**
  * RAGSourceBadges Component
  *
  * Displays document sources retrieved via RAG search.
- * Shows filename, page number, and similarity score for each source.
+ * Shows filename and page number for each source.
  *
  * Features:
  * - Compact badge layout
- * - Similarity score visualization
  * - Responsive: wraps on mobile
  * - Clickable for document preview
  */
@@ -33,13 +32,35 @@ export const RAGSourceBadges = ({
   onSourceClick,
 }: RAGSourceBadgesProps) => {
   if (!sources || sources.length === 0) {
+    console.log("[RAGSourceBadges] No sources provided");
     return null;
   }
 
-  // Remove duplicates by document_id
+  console.log("[RAGSourceBadges] Raw sources:", sources);
+
+  // Remove duplicates by document_id and ensure all required fields are present
   const uniqueSources = Array.from(
-    new Map(sources.map((s) => [s.document_id, s])).values()
+    new Map(
+      sources
+        .filter((s) => {
+          const isValid = s && (s.document_id || s.document_name);
+          if (!isValid) console.log("[RAGSourceBadges] Filtering out invalid source:", s);
+          return isValid;
+        })
+        .map((s) => {
+          const normalized = {
+            ...s,
+            document_id: s.document_id || s.id || "",
+            document_name: s.document_name || s.filename || "Document",
+            page_number: Number(s.page_number ?? s.page ?? 1),
+          };
+          console.log("[RAGSourceBadges] Normalized source:", normalized);
+          return [normalized.document_id, normalized];
+        })
+    ).values()
   );
+
+  console.log("[RAGSourceBadges] Final unique sources count:", uniqueSources.length);
 
   return (
     <div
@@ -51,7 +72,7 @@ export const RAGSourceBadges = ({
       {uniqueSources.map((source) => (
         <button
           key={`${source.document_id}-${source.page_number}`}
-          onClick={() => onSourceClick?.(source)}
+          onClick={() => onSourceClick?.(source.document_id, source.page_number || 1)}
           className={cn(
             "group inline-flex items-center gap-1.5",
             "px-2.5 py-1 rounded-full text-xs font-medium",
@@ -73,32 +94,8 @@ export const RAGSourceBadges = ({
 
           {/* Page Number */}
           <span className="opacity-70 group-hover:opacity-100">
-            p. {source.page_number}
+            Page {source.page_number}
           </span>
-
-          {/* Similarity Score - visual indicator */}
-          {source.similarity_score !== undefined && (
-            <div className="flex items-center gap-0.5 ml-1">
-              <div className="w-6 h-1.5 bg-muted rounded-full overflow-hidden">
-                <div
-                  className={cn(
-                    "h-full rounded-full transition-all",
-                    source.similarity_score >= 0.85
-                      ? "bg-green-500"
-                      : source.similarity_score >= 0.7
-                        ? "bg-blue-500"
-                        : "bg-yellow-500"
-                  )}
-                  style={{
-                    width: `${Math.round(source.similarity_score * 100)}%`,
-                  }}
-                />
-              </div>
-              <span className="text-xs opacity-60">
-                {Math.round(source.similarity_score * 100)}%
-              </span>
-            </div>
-          )}
 
           {/* External link icon on hover */}
           <ExternalLinkIcon className="h-3 w-3 flex-shrink-0 opacity-0 group-hover:opacity-70 transition-opacity" />

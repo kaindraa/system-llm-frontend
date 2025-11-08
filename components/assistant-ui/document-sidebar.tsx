@@ -10,14 +10,21 @@ import { DocumentViewer } from "@/components/assistant-ui/document-viewer";
 interface DocumentSidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  onSourceSelect?: (docId: string, pageNumber: number) => void;
+  selectedSourceDoc?: { docId: string; pageNumber: number } | null;
+  onSourceSelected?: () => void;
 }
 
 export const DocumentSidebar = ({
   isOpen,
   onClose,
+  onSourceSelect,
+  selectedSourceDoc,
+  onSourceSelected,
 }: DocumentSidebarProps) => {
   const [documents, setDocuments] = useState<DocumentResponse[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
+  const [selectedPage, setSelectedPage] = useState<number>(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -60,14 +67,39 @@ export const DocumentSidebar = ({
     loadDocuments();
   }, []);
 
+  // Handle selected source from message bubble
+  useEffect(() => {
+    if (selectedSourceDoc) {
+      console.log("[DocumentSidebar] Selected source received:", selectedSourceDoc);
+      setSelectedId(selectedSourceDoc.docId);
+      setSelectedPage(selectedSourceDoc.pageNumber);
+      setIsViewerLoading(true);
+      setTimeout(() => setIsViewerLoading(false), 500);
+      onSourceSelected?.();
+    }
+  }, [selectedSourceDoc, onSourceSelected]);
+
   const selectedDoc = documents && documents.length > 0
     ? documents.find((d) => d.id === selectedId)
     : undefined;
 
   const handleDocumentSelect = (docId: string) => {
     setSelectedId(docId);
+    setSelectedPage(1); // Reset to page 1 when selecting new document
     setShowDropdown(false);
     setIsViewerLoading(true);
+    // Simulate loading time for viewer to properly render
+    setTimeout(() => setIsViewerLoading(false), 500);
+  };
+
+  const handleSourceSelect = (docId: string, pageNumber: number) => {
+    console.log("[DocumentSidebar] Source clicked:", { docId, pageNumber });
+    setSelectedId(docId);
+    setSelectedPage(pageNumber);
+    setShowDropdown(false);
+    setIsViewerLoading(true);
+    // Call parent callback if provided
+    onSourceSelect?.(docId, pageNumber);
     // Simulate loading time for viewer to properly render
     setTimeout(() => setIsViewerLoading(false), 500);
   };
@@ -279,6 +311,8 @@ export const DocumentSidebar = ({
                     <DocumentViewer
                       document={selectedDoc}
                       isLoading={isViewerLoading}
+                      pageNumber={selectedPage}
+                      onSourceSelect={handleSourceSelect}
                     />
                   </div>
 
