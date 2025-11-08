@@ -4,6 +4,16 @@ import { useSearchParams } from "next/navigation";
 export interface Message {
   role: "user" | "assistant";
   content: string | Array<{ type: string; text?: string }>;
+  sources?: Array<{
+    document_id: string;
+    filename?: string;
+    document_name?: string;
+    page?: number;
+    page_number?: number;
+    similarity_score?: number;
+  }>;
+  created_at?: string;
+  ragSearched?: boolean;
 }
 
 export const useCurrentThread = () => {
@@ -60,7 +70,10 @@ export const useCurrentThread = () => {
       if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
         const formattedMessages = data.messages.map((msg: {
           role?: string;
-          content?: string | Array<{ type?: string; text?: string }>
+          content?: string | Array<{ type?: string; text?: string }>;
+          sources?: any[];
+          created_at?: string;
+          ragSearched?: boolean;
         }) => ({
           role: (msg.role || "user") as "user" | "assistant",
           content:
@@ -69,6 +82,9 @@ export const useCurrentThread = () => {
               : Array.isArray(msg.content)
               ? msg.content
               : "",
+          sources: msg.sources || undefined,
+          created_at: msg.created_at,
+          ragSearched: msg.ragSearched || (msg.sources && msg.sources.length > 0),
         }));
         setMessages(formattedMessages);
       } else {

@@ -77,15 +77,17 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
       console.log("[ChatContainer] No threadId, clearing local messages for new chat");
       setMessages([]);
     } else if (previousMessages) {
-      // ThreadId exists, sync with backend messages
+      // ThreadId exists, sync with backend messages (including sources and metadata)
       console.log("[ChatContainer] Loading messages for thread:", threadId, "message count:", previousMessages.length);
       const syncedMessages = previousMessages.map((msg) => ({
         role: msg.role,
         content: typeof msg.content === "string" ? msg.content : "",
-        created_at: new Date().toISOString(),
+        created_at: msg.created_at || new Date().toISOString(),
+        sources: msg.sources || undefined,
+        ragSearched: msg.ragSearched || false,
       }));
       setMessages(syncedMessages);
-      console.log("[ChatContainer] Messages synced, count:", syncedMessages.length);
+      console.log("[ChatContainer] Messages synced, count:", syncedMessages.length, "with sources");
     } else {
       console.log("[ChatContainer] ThreadId exists but no previousMessages yet (still loading?)");
     }
@@ -570,43 +572,30 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
 
         {/* Messages list */}
         <div className="flex flex-col gap-4">
-          {messages.map((msg, idx) => (
-            <MessageBubble key={idx} message={msg} isStreaming={isStreaming && idx === messages.length - 1 && msg.role === "assistant"} />
-          ))}
+          {messages.map((msg, idx) => {
+            const isLastMsg = idx === messages.length - 1;
+            const isAssistant = msg.role === "assistant";
+
+            return (
+              <div key={idx}>
+                {/* Message Bubble - ALL content (indicator, text, sources) now inside bubble */}
+                <MessageBubble
+                  message={msg}
+                  isStreaming={isStreaming && isLastMsg && isAssistant}
+                  loadingStage={isLastMsg && isAssistant ? loadingStage : "idle"}
+                  ragSearchState={isLastMsg && isAssistant ? ragSearchState : undefined}
+                />
+
+                {/* Streaming cursor - shows below bubble while streaming */}
+                {loadingStage === "streaming" && isLastMsg && isAssistant && (
+                  <div className="flex items-center gap-1 text-muted-foreground mt-1">
+                    <div className="inline-block w-1.5 h-4 bg-primary animate-pulse rounded-sm"></div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-
-        {/* Loading Stage Indicators */}
-        {/* 1. Analyzing stage - before RAG or during initial processing */}
-        {loadingStage === "analyzing" && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <div className="flex gap-0.5">
-              <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
-              <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
-              <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
-            </div>
-            <span>Analyzing</span>
-          </div>
-        )}
-
-        {/* 2. RAG Search Indicator - shows during searching and found stages */}
-        {(loadingStage === "searching" || loadingStage === "found") && (
-          <div className="flex justify-start max-w-[70%]">
-            <RAGSearchIndicator
-              isSearching={loadingStage === "searching"}
-              query={ragSearchState.query}
-              resultsCount={ragSearchState.resultsCount}
-              processingTime={ragSearchState.processingTime}
-              error={ragSearchState.error}
-            />
-          </div>
-        )}
-
-        {/* 3. Streaming cursor indicator - shows animated cursor while streaming text */}
-        {loadingStage === "streaming" && messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && (
-          <div className="flex items-center gap-1 text-muted-foreground mt-2">
-            <div className="inline-block w-1.5 h-4 bg-primary animate-pulse rounded-sm"></div>
-          </div>
-        )}
 
         {/* Scroll anchor */}
         <div ref={messagesEndRef} />
@@ -635,10 +624,20 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
 interface MessageBubbleProps {
   message: Message;
   isStreaming?: boolean;
+  hideSourceBadges?: boolean;
+  loadingStage?: "idle" | "analyzing" | "searching" | "found" | "streaming";
+  ragSearchState?: RAGSearchState;
 }
 
-const MessageBubbleComponent = ({ message, isStreaming = false }: MessageBubbleProps) => {
+const MessageBubbleComponent = ({
+  message,
+  isStreaming = false,
+  loadingStage = "idle",
+  ragSearchState
+}: Omit<MessageBubbleProps, 'hideSourceBadges'>) => {
   const isUser = message.role === "user";
+  // Show indicator saat searching/found stage, atau jika message already has ragSearched flag
+  const showRagIndicator = message.ragSearched || loadingStage === "searching" || loadingStage === "found";
 
   return (
     <div
@@ -646,13 +645,37 @@ const MessageBubbleComponent = ({ message, isStreaming = false }: MessageBubbleP
     >
       <div
         className={cn(
-          "rounded-lg px-4 py-2 max-w-[70%] break-words transition-all duration-200",
+          "rounded-lg px-4 py-3 max-w-[70%] break-words transition-all duration-200 flex flex-col gap-2",
           isUser
             ? "bg-muted text-foreground"
             : "bg-secondary text-secondary-foreground",
-          isStreaming && "shadow-md" // Add subtle shadow while streaming
+          isStreaming && "shadow-md"
         )}
       >
+        {/* Analyzing indicator - shown saat message baru dimulai */}
+        {!isUser && loadingStage === "analyzing" && (
+          <div className="flex items-center gap-2 text-sm opacity-75">
+            <div className="flex gap-0.5">
+              <div className="w-1 h-1 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
+              <div className="w-1 h-1 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
+              <div className="w-1 h-1 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+            </div>
+            <span>Analyzing</span>
+          </div>
+        )}
+
+        {/* RAG Search Indicator - shown INSIDE bubble for assistant messages */}
+        {!isUser && showRagIndicator && (
+          <RAGSearchIndicator
+            isSearching={loadingStage === "searching"}
+            query={ragSearchState?.query}
+            resultsCount={ragSearchState?.resultsCount || message.sources?.length || 0}
+            processingTime={ragSearchState?.processingTime}
+            className="mb-1"
+          />
+        )}
+
+        {/* Message Content */}
         {isUser ? (
           <p className="whitespace-pre-wrap text-sm">{message.content}</p>
         ) : (
@@ -660,30 +683,14 @@ const MessageBubbleComponent = ({ message, isStreaming = false }: MessageBubbleP
             <MarkdownRenderer>{message.content}</MarkdownRenderer>
           </div>
         )}
+
+        {/* Source Badges - shown INSIDE bubble at bottom */}
+        {!isUser && message.sources && message.sources.length > 0 && (
+          <div className="pt-2 border-t border-current/20">
+            <RAGSourceBadges sources={message.sources} className="text-xs" />
+          </div>
+        )}
       </div>
-
-      {/* RAG Search Indicator and Sources - only for assistant messages */}
-      {!isUser && (
-        <div className="w-full max-w-[70%]">
-          {/* RAG Search Indicator */}
-          {message.ragSearched && (
-            <RAGSearchIndicator
-              isSearching={false}
-              query={undefined}
-              resultsCount={message.sources?.length || 0}
-              className="mb-2"
-            />
-          )}
-
-          {/* Document Sources */}
-          {message.sources && message.sources.length > 0 && (
-            <RAGSourceBadges
-              sources={message.sources}
-              className="text-xs"
-            />
-          )}
-        </div>
-      )}
     </div>
   );
 };
