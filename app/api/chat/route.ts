@@ -202,6 +202,7 @@ export async function POST(req: Request) {
               // Parse SSE format
               if (line.startsWith("event:")) {
                 currentEventType = line.slice(6).trim();
+                console.log("[API Route] Detected event type:", currentEventType);
                 continue;
               }
 
@@ -210,14 +211,17 @@ export async function POST(req: Request) {
                 if (dataStr) {
                   try {
                     const data = JSON.parse(dataStr);
+                    console.log("[API Route] Processing event:", currentEventType, "data keys:", Object.keys(data));
 
                     // Skip user_message echo - don't send to frontend
                     if (currentEventType === "user_message") {
+                      console.log("[API Route] Skipping user_message echo");
                       continue;
                     }
 
                     // Handle RAG search events - forward directly to frontend
                     if (currentEventType === "rag_search") {
+                      console.log("[API Route] ✓ RAG search event detected! Status:", data.status, "Query:", data.query);
                       const ragResponse = {
                         type: "rag_search",
                         query: data.query,
@@ -226,6 +230,7 @@ export async function POST(req: Request) {
                         processing_time: data.processing_time,
                         error: data.error,
                       };
+                      console.log("[API Route] Forwarding RAG response to frontend:", ragResponse);
                       controller.enqueue(
                         encoder.encode(`data: ${JSON.stringify(ragResponse)}\n\n`)
                       );

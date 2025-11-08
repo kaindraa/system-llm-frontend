@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
+import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useCurrentThread } from "@/lib/hooks/useCurrentThread";
 import { useConversations } from "@/lib/hooks/useConversations";
@@ -11,6 +12,7 @@ import { MarkdownRenderer } from "@/components/assistant-ui/markdown-renderer";
 import { DocumentSidebar } from "@/components/assistant-ui/document-sidebar";
 import { RAGSearchIndicator } from "@/components/assistant-ui/rag-search-indicator";
 import { RAGSourceBadges } from "@/components/assistant-ui/rag-source-badges";
+import { ChatInputArea } from "@/components/assistant-ui/chat-input-area";
 import type { RAGSource, RAGSearchState } from "@/lib/types/rag";
 
 interface Message {
@@ -263,6 +265,7 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
       let buffer = "";
       let assistantContent = "";
       let currentSources: RAGSource[] = [];
+      let chunkCount = 0; // Track chunk count for logging
 
       try {
         let streamFinished = false;
@@ -291,71 +294,85 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
                 try {
                   const data = JSON.parse(dataStr);
 
-                  // Handle RAG search event
+                  // Handle RAG search event - with synchronous flush for real-time indicator
                   if (data.type === "rag_search") {
-                    console.log("[ChatContainer] RAG search event:", data);
+                    console.log("[ChatContainer] RAG search:", data.status, "query:", data.query);
                     if (data.status === "searching") {
-                      setRagSearchState({
-                        isSearching: true,
-                        query: data.query,
+                      // Force synchronous update for real-time indicator display
+                      flushSync(() => {
+                        setRagSearchState({
+                          isSearching: true,
+                          query: data.query,
+                        });
                       });
+
+                      // Mark message as searched
+                      flushSync(() => {
+                        setMessages((prev) => {
+                          const updated = [...prev];
+                          if (updated.length > 0) {
+                            updated[updated.length - 1] = {
+                              ...updated[updated.length - 1],
+                              ragSearched: true,
+                            };
+                          }
+                          return updated;
+                        });
+                      });
+                    } else if (data.status === "completed") {
+                      // Keep indicator visible with "Found X sources" message
+                      flushSync(() => {
+                        setRagSearchState((prev) => ({
+                          ...prev,
+                          isSearching: false, // Switch from "Searching..." to "Found X sources"
+                          resultsCount: data.results_count,
+                          processingTime: data.processing_time,
+                        }));
+                      });
+                    }
+                  }
+
+                  // Handle chunk event - with synchronous flush for streaming animation
+                  if (data.type === "chunk" && data.content) {
+                    chunkCount++;
+                    assistantContent += data.content;
+
+                    // Force synchronous render to show streaming text animation (perlahan, smooth)
+                    flushSync(() => {
                       setMessages((prev) => {
                         const updated = [...prev];
                         if (updated.length > 0) {
                           updated[updated.length - 1] = {
                             ...updated[updated.length - 1],
-                            ragSearched: true,
+                            content: assistantContent,
                           };
                         }
                         return updated;
                       });
-                    } else if (data.status === "completed") {
-                      setRagSearchState({
-                        isSearching: false,
-                        query: data.query,
-                        resultsCount: data.results_count,
-                        processingTime: data.processing_time,
-                      });
-                    }
-                  }
-
-                  // Handle chunk event
-                  if (data.type === "chunk" && data.content) {
-                    assistantContent += data.content;
-                    console.log("[ChatContainer] Chunk received, total length:", assistantContent.length);
-
-                    setMessages((prev) => {
-                      const updated = [...prev];
-                      if (updated.length > 0) {
-                        updated[updated.length - 1] = {
-                          ...updated[updated.length - 1],
-                          content: assistantContent,
-                        };
-                      }
-                      return updated;
                     });
                   }
 
-                  // Handle text delta (old format support)
+                  // Handle text delta (old format support) - with synchronous flush
                   if (data.type === "text-delta" && data.textDelta) {
                     assistantContent += data.textDelta;
 
-                    setMessages((prev) => {
-                      const updated = [...prev];
-                      if (updated.length > 0) {
-                        updated[updated.length - 1] = {
-                          ...updated[updated.length - 1],
-                          content: assistantContent,
-                        };
-                      }
-                      return updated;
+                    // Force synchronous render for streaming animation
+                    flushSync(() => {
+                      setMessages((prev) => {
+                        const updated = [...prev];
+                        if (updated.length > 0) {
+                          updated[updated.length - 1] = {
+                            ...updated[updated.length - 1],
+                            content: assistantContent,
+                          };
+                        }
+                        return updated;
+                      });
                     });
                   }
 
                   // Handle done event with sources
                   if (data.type === "done") {
-                    console.log("[ChatContainer] Done event received with sources:", data.sources?.length || 0);
-
                     // Extract sources from response if available
                     if (data.sources && Array.isArray(data.sources)) {
                       currentSources = data.sources.map((src: any) => ({
@@ -388,7 +405,6 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
 
                   // Handle finish event (old format)
                   if (data.type === "finish") {
-                    console.log("[ChatContainer] Finish event received (old format)");
                     streamFinished = true;
                     setIsStreaming(false);
                     setRagSearchState({ isSearching: false });
@@ -511,11 +527,11 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
           ))}
         </div>
 
-        {/* Real-time RAG Search Indicator */}
-        {ragSearchState.isSearching && (
+        {/* Real-time RAG Search Indicator - shows "Searching..." then "Found X sources" */}
+        {(ragSearchState.isSearching || (ragSearchState.resultsCount && ragSearchState.resultsCount > 0)) && (
           <div className="flex justify-start max-w-[70%]">
             <RAGSearchIndicator
-              isSearching={true}
+              isSearching={ragSearchState.isSearching}
               query={ragSearchState.query}
               resultsCount={ragSearchState.resultsCount}
               processingTime={ragSearchState.processingTime}
@@ -528,32 +544,15 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
         <div ref={messagesEndRef} />
       </div>
 
-        {/* Input area */}
-        <div className="aui-chat-input-wrapper border-t px-4 py-4">
-          <form ref={formRef} onSubmit={handleSendMessage} className="flex gap-2">
-            <textarea
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Send a message... (Shift+Enter for newline)"
-              className={cn(
-                "flex-1 rounded-lg border border-input bg-background px-4 py-2 text-sm",
-                "placeholder:text-muted-foreground",
-                "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background",
-                "resize-none"
-              )}
-              rows={2}
-              autoFocus
-            />
-            <Button
-              type="submit"
-              disabled={!inputValue.trim() || isSending || isCreatingConversation}
-              className="self-end"
-            >
-              <SendIcon className="h-4 w-4" />
-            </Button>
-          </form>
-        </div>
+        {/* Input area - memoized component for smooth typing */}
+        <ChatInputArea
+          inputValue={inputValue}
+          onInputChange={setInputValue}
+          onKeyDown={handleKeyDown}
+          onSubmit={handleSendMessage}
+          disabled={isSending || isCreatingConversation}
+          formRef={formRef}
+        />
       </div>
 
       {/* Document Sidebar */}
@@ -569,7 +568,7 @@ interface MessageBubbleProps {
   message: Message;
 }
 
-const MessageBubble = ({ message }: MessageBubbleProps) => {
+const MessageBubbleComponent = ({ message }: MessageBubbleProps) => {
   const isUser = message.role === "user";
 
   return (
@@ -618,3 +617,6 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
     </div>
   );
 };
+
+// Memoize MessageBubble to prevent re-renders on parent updates
+const MessageBubble = memo(MessageBubbleComponent);
