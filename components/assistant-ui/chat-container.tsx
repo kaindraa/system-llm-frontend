@@ -9,11 +9,16 @@ import { Button } from "@/components/ui/button";
 import { SendIcon, MenuIcon } from "lucide-react";
 import { MarkdownRenderer } from "@/components/assistant-ui/markdown-renderer";
 import { DocumentSidebar } from "@/components/assistant-ui/document-sidebar";
+import { RAGSearchIndicator } from "@/components/assistant-ui/rag-search-indicator";
+import { RAGSourceBadges } from "@/components/assistant-ui/rag-source-badges";
+import type { RAGSource, RAGSearchState } from "@/lib/types/rag";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   created_at?: string;
+  sources?: RAGSource[];
+  ragSearched?: boolean;
 }
 
 interface Config {
@@ -36,6 +41,9 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
   const [isStreaming, setIsStreaming] = useState(false);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [ragSearchState, setRagSearchState] = useState<RAGSearchState>({
+    isSearching: false,
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const isMountedRef = useRef(true);
@@ -244,6 +252,8 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
         role: "assistant",
         content: "",
         created_at: new Date().toISOString(),
+        sources: [],
+        ragSearched: false,
       };
       setMessages((prev) => [...prev, assistantMessage]);
 
@@ -252,6 +262,7 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
       const decoder = new TextDecoder();
       let buffer = "";
       let assistantContent = "";
+      let currentSources: RAGSource[] = [];
 
       try {
         let streamFinished = false;
@@ -280,6 +291,33 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
                 try {
                   const data = JSON.parse(dataStr);
 
+                  // Handle RAG search event
+                  if (data.type === "rag_search") {
+                    console.log("[ChatContainer] RAG search event:", data);
+                    if (data.status === "searching") {
+                      setRagSearchState({
+                        isSearching: true,
+                        query: data.query,
+                      });
+                      setMessages((prev) => {
+                        const updated = [...prev];
+                        updated[updated.length - 1] = {
+                          ...updated[updated.length - 1],
+                          ragSearched: true,
+                        };
+                        return updated;
+                      });
+                    } else if (data.status === "completed") {
+                      setRagSearchState({
+                        isSearching: false,
+                        query: data.query,
+                        resultsCount: data.results_count,
+                        processingTime: data.processing_time,
+                      });
+                    }
+                  }
+
+                  // Handle text delta
                   if (data.type === "text-delta" && data.textDelta) {
                     assistantContent += data.textDelta;
 
@@ -293,10 +331,33 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
                     });
                   }
 
+                  // Handle finish event with sources
                   if (data.type === "finish") {
-                    console.log("[ChatContainer] Received finish event");
+                    console.log("[ChatContainer] Received finish event", data);
+
+                    // Extract sources from response if available
+                    if (data.sources && Array.isArray(data.sources)) {
+                      currentSources = data.sources.map((src: any) => ({
+                        document_id: src.document_id,
+                        document_name: src.filename || src.document_name,
+                        page_number: src.page || src.page_number,
+                        similarity_score: src.similarity_score || 0.85,
+                      }));
+                    }
+
+                    // Update final message with sources
+                    setMessages((prev) => {
+                      const updated = [...prev];
+                      updated[updated.length - 1] = {
+                        ...updated[updated.length - 1],
+                        sources: currentSources,
+                      };
+                      return updated;
+                    });
+
                     streamFinished = true;
                     setIsStreaming(false);
+                    setRagSearchState({ isSearching: false });
                     break;
                   }
                 } catch (parseError) {
@@ -416,6 +477,19 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
           ))}
         </div>
 
+        {/* Real-time RAG Search Indicator */}
+        {ragSearchState.isSearching && (
+          <div className="flex justify-start max-w-[70%]">
+            <RAGSearchIndicator
+              isSearching={true}
+              query={ragSearchState.query}
+              resultsCount={ragSearchState.resultsCount}
+              processingTime={ragSearchState.processingTime}
+              error={ragSearchState.error}
+            />
+          </div>
+        )}
+
         {/* Scroll anchor */}
         <div ref={messagesEndRef} />
       </div>
@@ -466,7 +540,7 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
 
   return (
     <div
-      className={cn("flex w-full gap-3", isUser ? "justify-end" : "justify-start")}
+      className={cn("flex w-full gap-3 flex-col", isUser ? "items-end" : "items-start")}
     >
       <div
         className={cn(
@@ -484,6 +558,29 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
           </div>
         )}
       </div>
+
+      {/* RAG Search Indicator and Sources - only for assistant messages */}
+      {!isUser && (
+        <div className="w-full max-w-[70%]">
+          {/* RAG Search Indicator */}
+          {message.ragSearched && (
+            <RAGSearchIndicator
+              isSearching={false}
+              query={undefined}
+              resultsCount={message.sources?.length || 0}
+              className="mb-2"
+            />
+          )}
+
+          {/* Document Sources */}
+          {message.sources && message.sources.length > 0 && (
+            <RAGSourceBadges
+              sources={message.sources}
+              className="text-xs"
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 };
