@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Loader2, AlertCircle, Download, FileText, ChevronDown } from "lucide-react";
+import { X, Loader2, AlertCircle, FileText, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { documentService, type DocumentResponse } from "@/lib/services/document";
-import { Button } from "@/components/ui/button";
 import { DocumentViewer } from "@/components/assistant-ui/document-viewer";
 
 interface DocumentSidebarProps {
@@ -27,7 +26,6 @@ export const DocumentSidebar = ({
   const [selectedPage, setSelectedPage] = useState<number>(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isViewerLoading, setIsViewerLoading] = useState(false);
 
@@ -104,21 +102,6 @@ export const DocumentSidebar = ({
     setTimeout(() => setIsViewerLoading(false), 500);
   };
 
-  const handleDownload = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!selectedDoc) return;
-
-    try {
-      setIsDownloading(true);
-      await documentService.downloadDocumentAsFile(selectedDoc.id, selectedDoc.original_filename);
-    } catch (err) {
-      console.error("[DocumentSidebar] Download failed:", err);
-      setError("Failed to download document");
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return "0 B";
     const k = 1024;
@@ -178,10 +161,10 @@ export const DocumentSidebar = ({
       {/* Sidebar - Desktop static positioning, Mobile fixed */}
       <div
         className={cn(
-          "w-full sm:w-96 bg-background border-l border-border",
-          "flex flex-col h-full",
-          // Desktop: static, part of flex layout
-          "lg:flex-shrink-0 lg:h-auto",
+          "w-full bg-background border-l border-border",
+          "flex flex-col h-full overflow-hidden",
+          // Desktop: static, part of flex layout - keep h-full
+          "lg:flex-shrink-0",
           // Mobile: fixed, transforms off-screen
           "fixed lg:static right-0 top-0 bottom-0 z-40 lg:z-auto transition-transform duration-300 ease-out",
           "lg:translate-x-0",
@@ -230,14 +213,14 @@ export const DocumentSidebar = ({
           {/* Documents Dropdown + Viewer */}
           {!isLoading && documents.length > 0 && (
             <>
-              {/* Dropdown Section - Fixed */}
-              <div className="flex-shrink-0 p-3 border-b border-border">
+              {/* Dropdown Section - Fixed, compact */}
+              <div className="flex-shrink-0 px-3 py-2 border-b border-border">
                 <div className="relative">
                   {/* Dropdown Button */}
                   <button
                     onClick={() => setShowDropdown(!showDropdown)}
                     className={cn(
-                      "w-full flex items-center justify-between px-3 py-2.5 rounded-lg",
+                      "w-full flex items-center justify-between px-2 py-2 rounded-lg text-xs sm:text-sm",
                       "border transition-colors",
                       "bg-muted hover:bg-muted/80",
                       "border-border focus:outline-none focus:ring-2 focus:ring-ring"
@@ -246,8 +229,8 @@ export const DocumentSidebar = ({
                     <div className="flex items-start gap-2 min-w-0 flex-1">
                       <FileText className="h-4 w-4 flex-shrink-0 mt-0.5 text-muted-foreground" />
                       <div className="flex-1 min-w-0 text-left">
-                        <p className="text-sm font-medium truncate">
-                          {selectedDoc?.original_filename || "Select a document"}
+                        <p className="text-xs sm:text-sm font-medium truncate">
+                          {selectedDoc?.original_filename || "Select document"}
                         </p>
                         {selectedDoc && (
                           <p className="text-xs text-muted-foreground mt-0.5">
@@ -305,38 +288,13 @@ export const DocumentSidebar = ({
 
               {/* Document Viewer - Full Size */}
               {selectedDoc && (
-                <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-                  {/* Viewer Container - Full Space */}
-                  <div className="flex-1 overflow-hidden bg-background">
-                    <DocumentViewer
-                      document={selectedDoc}
-                      isLoading={isViewerLoading}
-                      pageNumber={selectedPage}
-                      onSourceSelect={handleSourceSelect}
-                    />
-                  </div>
-
-                  {/* Download Button - Minimal */}
-                  <div className="flex-shrink-0 px-3 py-2 border-t border-border">
-                    <Button
-                      onClick={handleDownload}
-                      disabled={isDownloading}
-                      className="w-full"
-                      size="sm"
-                    >
-                      {isDownloading ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          Downloading...
-                        </>
-                      ) : (
-                        <>
-                          <Download className="h-4 w-4 mr-2" />
-                          Download
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                <div className="flex-1 overflow-hidden bg-background min-h-0">
+                  <DocumentViewer
+                    document={selectedDoc}
+                    isLoading={isViewerLoading}
+                    pageNumber={selectedPage}
+                    onSourceSelect={handleSourceSelect}
+                  />
                 </div>
               )}
             </>
