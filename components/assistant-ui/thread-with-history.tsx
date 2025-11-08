@@ -28,7 +28,7 @@ export const ThreadWithHistory: FC = () => {
 
       {/* Thread component - New messages (no previous messages shown here) and composer input */}
       <div className="aui-thread-container w-full flex flex-col flex-shrink-0">
-        <Thread hasExistingMessages={previousMessages && previousMessages.length > 0} />
+        <Thread />
       </div>
     </div>
   );

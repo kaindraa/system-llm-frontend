@@ -49,11 +49,28 @@ export const MarkdownRenderer = ({ children }: MarkdownRendererProps) => {
             {children}
           </h6>
         ),
-        p: ({ children }) => (
-          <p className="my-4 leading-7">
-            {children}
-          </p>
-        ),
+        p: ({ children }) => {
+          // Check if children contains block elements (div, pre, etc)
+          // If so, render as div instead of p to avoid HTML validation errors
+          const hasBlockElements = Array.isArray(children) &&
+            children.some((child: any) =>
+              child?.type && (
+                child.type === 'div' ||
+                child.type === 'pre' ||
+                typeof child.type === 'string' && ['div', 'pre', 'table', 'blockquote', 'ul', 'ol'].includes(child.type)
+              )
+            );
+
+          if (hasBlockElements) {
+            return <div className="my-4 leading-7">{children}</div>;
+          }
+
+          return (
+            <p className="my-4 leading-7">
+              {children}
+            </p>
+          );
+        },
         a: ({ children, href }) => (
           <a
             href={href}
@@ -119,7 +136,7 @@ export const MarkdownRenderer = ({ children }: MarkdownRendererProps) => {
             {children}
           </td>
         ),
-        code: ({ inline, children, className }) => {
+        code: ({ inline, children, className }: { inline?: boolean; children?: React.ReactNode; className?: string }) => {
           const language = className?.replace(/language-/, "");
 
           if (inline) {

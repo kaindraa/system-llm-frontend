@@ -45,9 +45,9 @@ export const RAGSourceBadges = ({
       if (!isValid) console.log("[RAGSourceBadges] Filtering out invalid source:", s);
       return isValid;
     })
-    .map((s) => ({
+    .map((s: any) => ({
       ...s,
-      document_id: s.document_id || s.id || "",
+      document_id: s.document_id || "",
       document_name: s.document_name || s.filename || "Document",
       page_number: Number(s.page_number ?? s.page ?? 1),
     }));

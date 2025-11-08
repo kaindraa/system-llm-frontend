@@ -6,10 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCurrentThread } from "@/lib/hooks/useCurrentThread";
 import { useConversations } from "@/lib/hooks/useConversations";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { SendIcon, MenuIcon } from "lucide-react";
 import { MarkdownRenderer } from "@/components/assistant-ui/markdown-renderer";
-import { DocumentSidebar } from "@/components/assistant-ui/document-sidebar";
 import { RAGSearchIndicator } from "@/components/assistant-ui/rag-search-indicator";
 import { RAGSourceBadges } from "@/components/assistant-ui/rag-source-badges";
 import { ChatInputArea } from "@/components/assistant-ui/chat-input-area";
@@ -24,16 +21,17 @@ interface Message {
 }
 
 interface Config {
-  models: Array<{ id: string; name: string; display_name: string }>;
-  active_prompt?: { id: string; name: string };
+  models?: Array<{ id: string; name: string; display_name: string }>;
+  active_prompt?: { id: string; name: string; description?: string } | null;
 }
 
 interface ChatContainerProps {
-  config?: Config;
+  config?: Config | null;
   selectedModelName?: string;
+  onSourceClick?: (docId: string, pageNumber: number) => void;
 }
 
-export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps) => {
+export const ChatContainer = ({ config, selectedModelName, onSourceClick }: ChatContainerProps) => {
   const router = useRouter();
   const { threadId, messages: previousMessages, isLoading } = useCurrentThread();
   const { loadConversations } = useConversations();
@@ -42,9 +40,7 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
   const [isSending, setIsSending] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loadingStage, setLoadingStage] = useState<"idle" | "analyzing" | "searching" | "found" | "streaming">("idle");
-  const [selectedSourceDoc, setSelectedSourceDoc] = useState<{ docId: string; pageNumber: number } | null>(null);
   const [ragSearchState, setRagSearchState] = useState<RAGSearchState>({
     isSearching: false,
   });
@@ -77,16 +73,26 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
     if (!threadId) {
       console.log("[ChatContainer] No threadId, clearing local messages for new chat");
       setMessages([]);
-    } else if (previousMessages) {
+    } else if (previousMessages && previousMessages.length > 0) {
       // ThreadId exists, sync with backend messages (including sources and metadata)
       console.log("[ChatContainer] Loading messages for thread:", threadId, "message count:", previousMessages.length);
-      const syncedMessages = previousMessages.map((msg) => ({
-        role: msg.role,
-        content: typeof msg.content === "string" ? msg.content : "",
-        created_at: msg.created_at || new Date().toISOString(),
-        sources: msg.sources || undefined,
-        ragSearched: msg.ragSearched || false,
-      }));
+      const syncedMessages = (previousMessages as unknown as Array<Record<string, unknown>>).map((msg) => {
+        const sources = msg.sources as Array<Record<string, unknown>> | undefined;
+        const normalizedSources = sources?.map((src) => ({
+          document_id: (src.document_id as string) || "",
+          document_name: (src.document_name as string) || (src.filename as string) || "Document",
+          page_number: Number(src.page_number ?? src.page ?? 1),
+          similarity_score: Number(src.similarity_score ?? 0.85),
+          chunk_index: src.chunk_index as number | undefined,
+        }));
+        return {
+          role: (msg.role as "user" | "assistant") || "user",
+          content: typeof msg.content === "string" ? msg.content : "",
+          created_at: (msg.created_at as string) || new Date().toISOString(),
+          sources: normalizedSources,
+          ragSearched: (msg.ragSearched as boolean) || false,
+        };
+      });
       setMessages(syncedMessages);
       console.log("[ChatContainer] Messages synced, count:", syncedMessages.length, "with sources");
     } else {
@@ -94,12 +100,13 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
     }
   }, [threadId, previousMessages]);
 
-  // Handle source badge click - open sidebar and navigate to document
+  // Handle source badge click - notify parent and navigate to document
   const handleSourceClick = useCallback((docId: string, pageNumber: number) => {
     console.log("[ChatContainer] Source clicked:", { docId, pageNumber });
-    setSelectedSourceDoc({ docId, pageNumber });
-    setSidebarOpen(true); // Open sidebar when source is clicked
-  }, []);
+    if (onSourceClick) {
+      onSourceClick(docId, pageNumber);
+    }
+  }, [onSourceClick]);
 
   // Auto scroll to bottom - only scroll the chat viewport, not the page
   const scrollToBottom = useCallback(() => {
@@ -420,9 +427,9 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
                     // Extract sources from response if available
                     if (data.sources && Array.isArray(data.sources)) {
                       console.log("[ChatContainer] Processing", data.sources.length, "sources from done event");
-                      currentSources = data.sources.map((src: any) => ({
-                        document_id: src.document_id || "",
-                        document_name: src.document_name || src.filename || "Document",
+                      currentSources = (data.sources as Array<Record<string, unknown>>).map((src) => ({
+                        document_id: (src.document_id as string) || "",
+                        document_name: (src.document_name as string) || (src.filename as string) || "Document",
                         page_number: Number(src.page_number ?? src.page ?? 1),
                         similarity_score: Number(src.similarity_score ?? 0.85),
                       }));
@@ -547,26 +554,12 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
   };
 
   return (
-    <div className="aui-root aui-chat-container flex h-full w-full bg-background flex-1 min-w-0 overflow-hidden">
-      {/* Main chat area */}
-      <div className="flex flex-1 flex-col min-w-0">
-        {/* Header with sidebar toggle */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-border lg:hidden">
-          <span className="text-sm font-medium">Chat</span>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 hover:bg-muted rounded-lg transition-colors"
-            aria-label="Toggle documents sidebar"
-          >
-            <MenuIcon className="h-5 w-5" />
-          </button>
-        </div>
-
-        {/* Messages viewport */}
-        <div
-          ref={viewportRef}
-          className="aui-chat-viewport flex flex-1 flex-col overflow-y-auto px-4 py-4"
-        >
+    <div className="aui-root aui-chat-container flex h-full w-full bg-background flex-col min-w-0 overflow-hidden">
+      {/* Messages viewport */}
+      <div
+        ref={viewportRef}
+        className="aui-chat-viewport flex flex-1 flex-col overflow-y-auto px-4 py-4"
+      >
         {/* Loading indicator */}
         {isLoading && messages.length === 0 && (
           <div className="flex items-center justify-center py-8">
@@ -616,23 +609,14 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
         <div ref={messagesEndRef} />
       </div>
 
-        {/* Input area - memoized component for smooth typing */}
-        <ChatInputArea
-          inputValue={inputValue}
-          onInputChange={setInputValue}
-          onKeyDown={handleKeyDown}
-          onSubmit={handleSendMessage}
-          disabled={isSending || isCreatingConversation}
-          formRef={formRef}
-        />
-      </div>
-
-      {/* Document Sidebar */}
-      <DocumentSidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        selectedSourceDoc={selectedSourceDoc}
-        onSourceSelected={() => setSelectedSourceDoc(null)}
+      {/* Input area - memoized component for smooth typing */}
+      <ChatInputArea
+        inputValue={inputValue}
+        onInputChange={setInputValue}
+        onKeyDown={handleKeyDown}
+        onSubmit={handleSendMessage}
+        disabled={isSending || isCreatingConversation}
+        formRef={formRef as React.RefObject<HTMLFormElement | null>}
       />
     </div>
   );
