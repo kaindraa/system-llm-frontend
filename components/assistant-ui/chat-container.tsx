@@ -301,10 +301,12 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
                       });
                       setMessages((prev) => {
                         const updated = [...prev];
-                        updated[updated.length - 1] = {
-                          ...updated[updated.length - 1],
-                          ragSearched: true,
-                        };
+                        if (updated.length > 0) {
+                          updated[updated.length - 1] = {
+                            ...updated[updated.length - 1],
+                            ragSearched: true,
+                          };
+                        }
                         return updated;
                       });
                     } else if (data.status === "completed") {
@@ -317,23 +319,42 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
                     }
                   }
 
-                  // Handle text delta
+                  // Handle chunk event
+                  if (data.type === "chunk" && data.content) {
+                    assistantContent += data.content;
+                    console.log("[ChatContainer] Chunk received, total length:", assistantContent.length);
+
+                    setMessages((prev) => {
+                      const updated = [...prev];
+                      if (updated.length > 0) {
+                        updated[updated.length - 1] = {
+                          ...updated[updated.length - 1],
+                          content: assistantContent,
+                        };
+                      }
+                      return updated;
+                    });
+                  }
+
+                  // Handle text delta (old format support)
                   if (data.type === "text-delta" && data.textDelta) {
                     assistantContent += data.textDelta;
 
                     setMessages((prev) => {
                       const updated = [...prev];
-                      updated[updated.length - 1] = {
-                        ...updated[updated.length - 1],
-                        content: assistantContent,
-                      };
+                      if (updated.length > 0) {
+                        updated[updated.length - 1] = {
+                          ...updated[updated.length - 1],
+                          content: assistantContent,
+                        };
+                      }
                       return updated;
                     });
                   }
 
-                  // Handle finish event with sources
-                  if (data.type === "finish") {
-                    console.log("[ChatContainer] Received finish event", data);
+                  // Handle done event with sources
+                  if (data.type === "done") {
+                    console.log("[ChatContainer] Done event received with sources:", data.sources?.length || 0);
 
                     // Extract sources from response if available
                     if (data.sources && Array.isArray(data.sources)) {
@@ -346,15 +367,28 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
                     }
 
                     // Update final message with sources
+                    const finalContent = data.content || assistantContent;
                     setMessages((prev) => {
                       const updated = [...prev];
-                      updated[updated.length - 1] = {
-                        ...updated[updated.length - 1],
-                        sources: currentSources,
-                      };
+                      if (updated.length > 0) {
+                        updated[updated.length - 1] = {
+                          ...updated[updated.length - 1],
+                          sources: currentSources,
+                          content: finalContent,
+                        };
+                      }
                       return updated;
                     });
 
+                    streamFinished = true;
+                    setIsStreaming(false);
+                    setRagSearchState({ isSearching: false });
+                    break;
+                  }
+
+                  // Handle finish event (old format)
+                  if (data.type === "finish") {
+                    console.log("[ChatContainer] Finish event received (old format)");
                     streamFinished = true;
                     setIsStreaming(false);
                     setRagSearchState({ isSearching: false });

@@ -216,41 +216,61 @@ export async function POST(req: Request) {
                       continue;
                     }
 
+                    // Handle RAG search events - forward directly to frontend
+                    if (currentEventType === "rag_search") {
+                      const ragResponse = {
+                        type: "rag_search",
+                        query: data.query,
+                        status: data.status,
+                        results_count: data.results_count,
+                        processing_time: data.processing_time,
+                        error: data.error,
+                      };
+                      controller.enqueue(
+                        encoder.encode(`data: ${JSON.stringify(ragResponse)}\n\n`)
+                      );
+                      continue;
+                    }
+
                     // Handle chunk events - these are text pieces from LLM
                     if (currentEventType === "chunk") {
                       const chunk = data.content || "";
                       if (chunk) {
                         const response = {
-                          type: "text-delta",
-                          textDelta: chunk,
+                          type: "chunk",
+                          content: chunk,
                         };
                         controller.enqueue(
                           encoder.encode(`data: ${JSON.stringify(response)}\n\n`)
                         );
                       }
+                      continue;
                     }
 
-                    // Handle done event - final response from assistant
+                    // Handle done event - final response from assistant with sources
                     if (currentEventType === "done") {
-                      // Send finish message to indicate streaming is complete
+                      // Send done message with sources
                       const finishResponse = {
-                        type: "finish",
-                        finishReason: "stop",
+                        type: "done",
+                        content: data.content,
+                        sources: data.sources || [],
                       };
                       controller.enqueue(
                         encoder.encode(`data: ${JSON.stringify(finishResponse)}\n\n`)
                       );
+                      continue;
                     }
 
                     // Handle error event - backend encountered an error
                     if (currentEventType === "error") {
                       const errorResponse = {
-                        type: "finish",
-                        finishReason: "error",
+                        type: "error",
+                        message: data.message || "Unknown error",
                       };
                       controller.enqueue(
                         encoder.encode(`data: ${JSON.stringify(errorResponse)}\n\n`)
                       );
+                      continue;
                     }
                   } catch {
                     // Silently ignore parsing errors
