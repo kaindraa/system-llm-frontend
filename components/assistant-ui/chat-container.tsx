@@ -43,6 +43,7 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
   const [isStreaming, setIsStreaming] = useState(false);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [loadingStage, setLoadingStage] = useState<"idle" | "analyzing" | "searching" | "found" | "streaming">("idle");
   const [ragSearchState, setRagSearchState] = useState<RAGSearchState>({
     isSearching: false,
   });
@@ -93,14 +94,22 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
   // Auto scroll to bottom - only scroll the chat viewport, not the page
   const scrollToBottom = useCallback(() => {
     if (viewportRef.current) {
-      // Scroll only the chat viewport container to bottom
-      viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
+      // Use requestAnimationFrame for smooth, responsive scrolling
+      requestAnimationFrame(() => {
+        if (viewportRef.current) {
+          viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
+        }
+      });
     }
   }, []);
 
+  // Scroll whenever messages change (for streaming text animation)
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+    // Only scroll if streaming, for better performance
+    if (isStreaming) {
+      scrollToBottom();
+    }
+  }, [messages, isStreaming, scrollToBottom]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -259,6 +268,10 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
       };
       setMessages((prev) => [...prev, assistantMessage]);
 
+      // Set initial loading stage to "analyzing"
+      setLoadingStage("analyzing");
+      console.log("[ChatContainer] Loading stage: analyzing");
+
       // Parse streaming response
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -269,12 +282,15 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
 
       try {
         let streamFinished = false;
+        let loopCount = 0;
         while (!streamFinished) {
-          console.log("[ChatContainer] Waiting for stream chunk...");
+          loopCount++;
+          console.log("[ChatContainer] Loop #" + loopCount + " - Waiting for stream chunk...");
           const { done, value } = await reader.read();
 
           if (done) {
-            console.log("[ChatContainer] Stream done (done=true)");
+            console.log("[ChatContainer] ⚠️  Stream done (done=true) but streamFinished=", streamFinished);
+            console.log("[ChatContainer] This means 'done' event was never received. Breaking anyway.");
             break;
           }
 
@@ -298,6 +314,10 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
                   if (data.type === "rag_search") {
                     console.log("[ChatContainer] RAG search:", data.status, "query:", data.query);
                     if (data.status === "searching") {
+                      // Update loading stage to "searching"
+                      setLoadingStage("searching");
+                      console.log("[ChatContainer] Loading stage: searching");
+
                       // Force synchronous update for real-time indicator display
                       flushSync(() => {
                         setRagSearchState({
@@ -320,6 +340,10 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
                         });
                       });
                     } else if (data.status === "completed") {
+                      // Update loading stage to "found"
+                      setLoadingStage("found");
+                      console.log("[ChatContainer] Loading stage: found");
+
                       // Keep indicator visible with "Found X sources" message
                       flushSync(() => {
                         setRagSearchState((prev) => ({
@@ -335,6 +359,13 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
                   // Handle chunk event - with synchronous flush for streaming animation
                   if (data.type === "chunk" && data.content) {
                     chunkCount++;
+
+                    // Update loading stage to "streaming" on first chunk
+                    if (chunkCount === 1) {
+                      setLoadingStage("streaming");
+                      console.log("[ChatContainer] Loading stage: streaming (first chunk received)");
+                    }
+
                     assistantContent += data.content;
 
                     // Force synchronous render to show streaming text animation (perlahan, smooth)
@@ -373,6 +404,7 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
 
                   // Handle done event with sources
                   if (data.type === "done") {
+                    console.log("[ChatContainer] ✅ DONE event received!");
                     // Extract sources from response if available
                     if (data.sources && Array.isArray(data.sources)) {
                       currentSources = data.sources.map((src: any) => ({
@@ -398,7 +430,9 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
                     });
 
                     streamFinished = true;
+                    console.log("[ChatContainer] streamFinished set to true, breaking loop");
                     setIsStreaming(false);
+                    setLoadingStage("idle"); // Reset loading stage
                     setRagSearchState({ isSearching: false });
                     break;
                   }
@@ -407,6 +441,7 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
                   if (data.type === "finish") {
                     streamFinished = true;
                     setIsStreaming(false);
+                    setLoadingStage("idle"); // Reset loading stage
                     setRagSearchState({ isSearching: false });
                     break;
                   }
@@ -421,9 +456,13 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
         }
         console.log("[ChatContainer] Streaming loop completed successfully");
       } finally {
-        console.log("[ChatContainer] Releasing reader lock");
-        reader.releaseLock();
-        console.log("[ChatContainer] Reader lock released, exiting stream handler");
+        try {
+          console.log("[ChatContainer] Releasing reader lock (finally block)");
+          reader.releaseLock();
+          console.log("[ChatContainer] Reader lock released successfully");
+        } catch (err) {
+          console.log("[ChatContainer] Error releasing reader lock (ignored):", err);
+        }
       }
     } catch (error) {
       console.error("[ChatContainer] ERROR in send message block:", error);
@@ -445,13 +484,22 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
       ]);
     } finally {
       // Reset all sending states
+      console.log("[ChatContainer] FINALLY BLOCK: Resetting sending/streaming states");
+      console.log("[ChatContainer] Before reset - isSending:", isSending, "isStreaming:", isStreaming);
+
       setIsSending(false);
       setIsStreaming(false);
+      setLoadingStage("idle"); // Reset loading stage to idle
+
+      console.log("[ChatContainer] After reset - states should now be false");
 
       // Navigate AFTER everything is done
       if (navigateToThreadId) {
+        console.log("[ChatContainer] Navigating to thread:", navigateToThreadId);
         if (isMountedRef.current) {
           router.push(`/?thread=${navigateToThreadId}`);
+        } else {
+          console.log("[ChatContainer] Component unmounted, skipping navigation");
         }
       }
     }
@@ -523,20 +571,40 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
         {/* Messages list */}
         <div className="flex flex-col gap-4">
           {messages.map((msg, idx) => (
-            <MessageBubble key={idx} message={msg} />
+            <MessageBubble key={idx} message={msg} isStreaming={isStreaming && idx === messages.length - 1 && msg.role === "assistant"} />
           ))}
         </div>
 
-        {/* Real-time RAG Search Indicator - shows "Searching..." then "Found X sources" */}
-        {(ragSearchState.isSearching || (ragSearchState.resultsCount && ragSearchState.resultsCount > 0)) && (
+        {/* Loading Stage Indicators */}
+        {/* 1. Analyzing stage - before RAG or during initial processing */}
+        {loadingStage === "analyzing" && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex gap-0.5">
+              <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
+              <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
+              <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+            </div>
+            <span>Analyzing</span>
+          </div>
+        )}
+
+        {/* 2. RAG Search Indicator - shows during searching and found stages */}
+        {(loadingStage === "searching" || loadingStage === "found") && (
           <div className="flex justify-start max-w-[70%]">
             <RAGSearchIndicator
-              isSearching={ragSearchState.isSearching}
+              isSearching={loadingStage === "searching"}
               query={ragSearchState.query}
               resultsCount={ragSearchState.resultsCount}
               processingTime={ragSearchState.processingTime}
               error={ragSearchState.error}
             />
+          </div>
+        )}
+
+        {/* 3. Streaming cursor indicator - shows animated cursor while streaming text */}
+        {loadingStage === "streaming" && messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && (
+          <div className="flex items-center gap-1 text-muted-foreground mt-2">
+            <div className="inline-block w-1.5 h-4 bg-primary animate-pulse rounded-sm"></div>
           </div>
         )}
 
@@ -566,9 +634,10 @@ export const ChatContainer = ({ config, selectedModelName }: ChatContainerProps)
 
 interface MessageBubbleProps {
   message: Message;
+  isStreaming?: boolean;
 }
 
-const MessageBubbleComponent = ({ message }: MessageBubbleProps) => {
+const MessageBubbleComponent = ({ message, isStreaming = false }: MessageBubbleProps) => {
   const isUser = message.role === "user";
 
   return (
@@ -577,10 +646,11 @@ const MessageBubbleComponent = ({ message }: MessageBubbleProps) => {
     >
       <div
         className={cn(
-          "rounded-lg px-4 py-2 max-w-[70%] break-words",
+          "rounded-lg px-4 py-2 max-w-[70%] break-words transition-all duration-200",
           isUser
             ? "bg-muted text-foreground"
-            : "bg-secondary text-secondary-foreground"
+            : "bg-secondary text-secondary-foreground",
+          isStreaming && "shadow-md" // Add subtle shadow while streaming
         )}
       >
         {isUser ? (

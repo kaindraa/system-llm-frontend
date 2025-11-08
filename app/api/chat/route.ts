@@ -260,10 +260,13 @@ export async function POST(req: Request) {
                         content: data.content,
                         sources: data.sources || [],
                       };
+                      console.log("[API Route] Sending done event and closing stream");
                       controller.enqueue(
                         encoder.encode(`data: ${JSON.stringify(finishResponse)}\n\n`)
                       );
-                      continue;
+                      // Close the stream after sending done event
+                      controller.close();
+                      return; // Exit the async function
                     }
 
                     // Handle error event - backend encountered an error
