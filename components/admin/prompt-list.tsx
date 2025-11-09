@@ -78,7 +78,7 @@ export const PromptList: FC<PromptListProps> = ({
                 Name
               </th>
               <th className="px-4 py-3 text-left text-sm font-semibold">
-                Description
+                Prompt
               </th>
               <th className="px-4 py-3 text-center text-sm font-semibold w-24">
                 Active
@@ -93,19 +93,13 @@ export const PromptList: FC<PromptListProps> = ({
               <tr key={prompt.id} className="border-b hover:bg-muted/50">
                 {/* Name */}
                 <td className="px-4 py-3">
-                  <div>
-                    <p className="font-medium">{prompt.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {prompt.content.substring(0, 60)}
-                      {prompt.content.length > 60 ? "..." : ""}
-                    </p>
-                  </div>
+                  <p className="font-medium">{prompt.name}</p>
                 </td>
 
-                {/* Description */}
+                {/* Prompt Content */}
                 <td className="px-4 py-3">
-                  <p className="text-sm text-muted-foreground">
-                    {prompt.description || "-"}
+                  <p className="text-sm text-muted-foreground line-clamp-2">
+                    {prompt.content || "-"}
                   </p>
                 </td>
 

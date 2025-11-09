@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Save, Loader2, X, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PromptList } from "@/components/admin/prompt-list";
 import { PromptFormModal } from "@/components/admin/prompt-form-modal";
@@ -11,6 +11,7 @@ import {
   type PromptCreateRequest,
   type PromptUpdateRequest,
 } from "@/lib/services/prompt";
+import { ragService, type ChatConfig } from "@/lib/services/rag";
 
 const PAGE_SIZE = 10;
 
@@ -23,6 +24,14 @@ export default function PromptPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<Prompt | undefined>();
   const [isFormLoading, setIsFormLoading] = useState(false);
+
+  // General prompt (chat config) state
+  const [chatConfig, setChatConfig] = useState<ChatConfig | null>(null);
+  const [generalPrompt, setGeneralPrompt] = useState("");
+  const [isEditingGeneral, setIsEditingGeneral] = useState(false);
+  const [isSavingGeneral, setIsSavingGeneral] = useState(false);
+  const [generalPromptError, setGeneralPromptError] = useState<string | null>(null);
+  const [generalPromptSuccess, setGeneralPromptSuccess] = useState<string | null>(null);
 
   // Load prompts
   const loadPrompts = async (page: number = 1, search?: string) => {
@@ -41,9 +50,66 @@ export default function PromptPage() {
     }
   };
 
+  // Load general prompt (chat config)
+  const loadGeneralPrompt = async () => {
+    try {
+      const config = await ragService.getChatConfig();
+      console.log("[Prompt Page] Loaded chat config:", config);
+      setChatConfig(config);
+      setGeneralPrompt(config.prompt_general || "");
+      setGeneralPromptError(null);
+    } catch (error) {
+      console.error("Error loading chat config:", error);
+      setGeneralPromptError("Failed to load general prompt");
+      // Set empty config to still show the section
+      setChatConfig({
+        id: 0,
+        prompt_general: "",
+        default_top_k: 5,
+        max_top_k: 10,
+        similarity_threshold: 0.7,
+        tool_calling_max_iterations: 10,
+        tool_calling_enabled: true,
+        include_rag_instruction: true,
+        updated_at: new Date().toISOString(),
+      });
+    }
+  };
+
+  // Save general prompt (chat config)
+  const handleSaveGeneralPrompt = async () => {
+    setIsSavingGeneral(true);
+    setGeneralPromptError(null);
+    setGeneralPromptSuccess(null);
+    try {
+      await ragService.updateChatConfig({ prompt_general: generalPrompt });
+      setGeneralPromptSuccess("General prompt saved successfully");
+      setIsEditingGeneral(false);
+      await loadGeneralPrompt();
+      // Clear success message after 3 seconds
+      setTimeout(() => setGeneralPromptSuccess(null), 3000);
+    } catch (error) {
+      console.error("Error saving general prompt:", error);
+      setGeneralPromptError(
+        error instanceof Error ? error.message : "Failed to save general prompt"
+      );
+    } finally {
+      setIsSavingGeneral(false);
+    }
+  };
+
+  const handleCancelEditGeneral = () => {
+    if (chatConfig) {
+      setGeneralPrompt(chatConfig.prompt_general);
+    }
+    setIsEditingGeneral(false);
+    setGeneralPromptError(null);
+  };
+
   // Initial load
   useEffect(() => {
     loadPrompts(1);
+    loadGeneralPrompt();
   }, []);
 
   // Handle create/update
@@ -121,30 +187,91 @@ export default function PromptPage() {
   };
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-8 px-6 py-6">
       {/* Page Header */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight">System Prompts</h1>
-            <p className="mt-2 text-base text-muted-foreground">
-              Create and manage system prompts for LLM conversations
-            </p>
-          </div>
-          <Button
-            onClick={() => handleOpenForm()}
-            size="lg"
-            className="gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Create Prompt
-          </Button>
-        </div>
+      <div className="flex flex-col gap-4">
+        <h1 className="text-4xl font-bold tracking-tight">System Prompts</h1>
+        <p className="text-base text-muted-foreground max-w-2xl">
+          Create and manage system prompts for LLM conversations
+        </p>
       </div>
 
-      {/* Search and Filters Card */}
+      {/* General Prompt Section */}
+      {chatConfig && (
+        <div className="rounded-lg border bg-card overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-500/10 to-blue-500/5 px-6 py-4 border-b">
+            <h2 className="text-xl font-semibold text-foreground">General System Prompt</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              This prompt is prepended to all LLM conversations
+            </p>
+          </div>
+
+          <div className="p-6">
+            {generalPromptError && (
+              <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm">
+                {generalPromptError}
+              </div>
+            )}
+
+            {generalPromptSuccess && (
+              <div className="mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-700 text-sm">
+                {generalPromptSuccess}
+              </div>
+            )}
+
+            {isEditingGeneral ? (
+              <div className="space-y-4">
+                <textarea
+                  value={generalPrompt}
+                  onChange={(e) => setGeneralPrompt(e.target.value)}
+                  placeholder="Enter the general system prompt that will be used for all conversations..."
+                  rows={8}
+                  className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleSaveGeneralPrompt}
+                    disabled={isSavingGeneral}
+                    className="gap-2"
+                  >
+                    {isSavingGeneral && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {isSavingGeneral ? "Saving..." : "Save"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleCancelEditGeneral}
+                    disabled={isSavingGeneral}
+                    className="gap-2"
+                  >
+                    <X className="h-4 w-4" />
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-4 bg-muted rounded-lg border border-input min-h-32">
+                  <p className="text-sm text-foreground whitespace-pre-wrap">
+                    {generalPrompt || "(No general prompt set)"}
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setIsEditingGeneral(true)}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Edit className="h-4 w-4" />
+                  Edit Prompt
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Search and Filters Card with Create Button */}
       <div className="rounded-lg border bg-card p-4">
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <input
             type="text"
             placeholder="Search by name or description..."
@@ -152,6 +279,14 @@ export default function PromptPage() {
             onChange={(e) => handleSearch(e.target.value)}
             className="flex-1 rounded-md border border-input bg-background px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           />
+          <Button
+            onClick={() => handleOpenForm()}
+            size="default"
+            className="gap-2 flex-shrink-0"
+          >
+            <Plus className="h-4 w-4" />
+            Create Prompt
+          </Button>
         </div>
       </div>
 
