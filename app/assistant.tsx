@@ -103,8 +103,10 @@ const AssistantContent = ({
   const [docSidebarOpen, setDocSidebarOpen] = useState(true);
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [isEndingSession, setIsEndingSession] = useState<string | null>(null); // Store threadId of session being ended
+  const [isSessionAnalyzed, setIsSessionAnalyzed] = useState(false); // Track if session status is "analyzed"
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { sizes, saveSizes, isLoading: panelSizesLoading } = useResizablePanelSizes();
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get current conversation details
   const currentConversation = conversations.find((c) => c.id === threadId);
@@ -140,6 +142,55 @@ const AssistantContent = ({
       }
     }
   }, [currentConversation, threadId, config]);
+
+  // Poll session status to detect if admin ended the session
+  useEffect(() => {
+    if (!threadId) {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      return;
+    }
+
+    const pollSessionStatus = async () => {
+      try {
+        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+        const response = await fetch(`${API_BASE_URL}/chat/sessions/${threadId}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Check if session status is "analyzed"
+          const isAnalyzed = data.status === "analyzed";
+          if (isAnalyzed !== isSessionAnalyzed) {
+            setIsSessionAnalyzed(isAnalyzed);
+            if (isAnalyzed) {
+              console.log("[Assistant] Session status: analyzed");
+            }
+          }
+        }
+      } catch (error) {
+        console.error("[Assistant] Error polling session status:", error);
+      }
+    };
+
+    // Poll every 5 seconds
+    pollSessionStatus();
+    pollIntervalRef.current = setInterval(pollSessionStatus, 5000);
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [threadId, isEndingSession, isSessionAnalyzed]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -327,7 +378,7 @@ const AssistantContent = ({
 
           {/* Center Panel - Chat Container */}
           <Panel defaultSize={sizes.center} minSize={30} maxSize={70}>
-            <div className={`h-full transition-opacity duration-300 ${isEndingSession === threadId ? "opacity-50 pointer-events-none" : ""}`}>
+            <div className={`h-full transition-opacity duration-300 ${isEndingSession === threadId || isSessionAnalyzed ? "opacity-50 pointer-events-none" : ""}`}>
               <ChatContainer
                 config={config}
                 selectedModelName={selectedModelName}
@@ -335,7 +386,7 @@ const AssistantContent = ({
                   setSelectedSourceDoc({ docId, pageNumber });
                   setDocSidebarOpen(true);
                 }}
-                isSessionEnding={isEndingSession === threadId}
+                isSessionEnding={isEndingSession === threadId || isSessionAnalyzed}
               />
             </div>
           </Panel>
