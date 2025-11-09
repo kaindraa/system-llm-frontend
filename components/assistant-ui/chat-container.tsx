@@ -554,30 +554,32 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick }: Chat
 
         {/* Messages list */}
         <div className="flex flex-col gap-4">
-          {messages.map((msg, idx) => {
-            const isLastMsg = idx === messages.length - 1;
-            const isAssistant = msg.role === "assistant";
+          {messages
+            .filter((msg) => msg.role !== "system")
+            .map((msg, idx) => {
+              const isLastMsg = idx === messages.filter((m) => m.role !== "system").length - 1;
+              const isAssistant = msg.role === "assistant";
 
-            return (
-              <div key={idx}>
-                {/* Message Bubble - ALL content (indicator, text, sources) now inside bubble */}
-                <MessageBubble
-                  message={msg}
-                  isStreaming={isStreaming && isLastMsg && isAssistant}
-                  loadingStage={isLastMsg && isAssistant ? loadingStage : "idle"}
-                  ragSearchState={isLastMsg && isAssistant ? ragSearchState : undefined}
-                  onSourceClick={handleSourceClick}
-                />
+              return (
+                <div key={idx}>
+                  {/* Message Bubble - ALL content (indicator, text, sources) now inside bubble */}
+                  <MessageBubble
+                    message={msg}
+                    isStreaming={isStreaming && isLastMsg && isAssistant}
+                    loadingStage={isLastMsg && isAssistant ? loadingStage : "idle"}
+                    ragSearchState={isLastMsg && isAssistant ? ragSearchState : undefined}
+                    onSourceClick={handleSourceClick}
+                  />
 
-                {/* Streaming cursor - shows below bubble while streaming */}
-                {loadingStage === "streaming" && isLastMsg && isAssistant && (
-                  <div className="flex items-center gap-1 text-muted-foreground mt-1">
-                    <div className="inline-block w-1.5 h-4 bg-primary animate-pulse rounded-sm"></div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                  {/* Streaming cursor - shows below bubble while streaming */}
+                  {loadingStage === "streaming" && isLastMsg && isAssistant && (
+                    <div className="flex items-center gap-1 text-muted-foreground mt-1">
+                      <div className="inline-block w-1.5 h-4 bg-primary animate-pulse rounded-sm"></div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
         </div>
 
         {/* Scroll anchor */}
