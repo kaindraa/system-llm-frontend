@@ -24,6 +24,7 @@ import { useCurrentThread } from "@/lib/hooks/useCurrentThread";
 import { useConversations } from "@/lib/hooks/useConversations";
 import { useResizablePanelSizes } from "@/lib/hooks/useResizablePanelSizes";
 import { getPromptName } from "@/lib/services/conversation";
+import { API_BASE_URL } from "@/lib/config";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,9 +50,8 @@ export const Assistant = () => {
     const fetchConfig = async () => {
       try {
         const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-        const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
 
-        const response = await fetch(`${backendUrl}/chat/config`, {
+        const response = await fetch(`${API_BASE_URL}/chat/config`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -102,7 +102,7 @@ const AssistantContent = ({
   const [selectedSourceDoc, setSelectedSourceDoc] = useState<{ docId: string; pageNumber: number } | null>(null);
   const [docSidebarOpen, setDocSidebarOpen] = useState(true);
   const [showEndDialog, setShowEndDialog] = useState(false);
-  const [isEndingSession, setIsEndingSession] = useState(false);
+  const [isEndingSession, setIsEndingSession] = useState<string | null>(null); // Store threadId of session being ended
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { sizes, saveSizes, isLoading: panelSizesLoading } = useResizablePanelSizes();
 
@@ -168,12 +168,14 @@ const AssistantContent = ({
   const handleEndSession = async () => {
     if (!threadId) return;
 
-    setIsEndingSession(true);
+    setIsEndingSession(threadId);
+    setShowEndDialog(false);
+
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-      const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
 
-      const response = await fetch(`${backendUrl}/chat/sessions/${threadId}/analysis`, {
+      // Call analysis endpoint to end session and analyze
+      const analysisResponse = await fetch(`${API_BASE_URL}/chat/sessions/${threadId}/analysis`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -181,21 +183,19 @@ const AssistantContent = ({
         },
       });
 
-      if (!response.ok) {
+      if (!analysisResponse.ok) {
         throw new Error("Failed to end session");
       }
 
-      const data = await response.json();
-      console.log("[Assistant] Session analysis:", data);
+      const analysisData = await analysisResponse.json();
+      console.log("[Assistant] Session analysis completed:", analysisData);
 
-      // Redirect to home or sessions list
+      // Redirect after successful closure
       router.push("/");
     } catch (error) {
       console.error("[Assistant] Error ending session:", error);
       alert("Failed to end session. Please try again.");
-    } finally {
-      setIsEndingSession(false);
-      setShowEndDialog(false);
+      setIsEndingSession(null);
     }
   };
 
@@ -260,9 +260,9 @@ const AssistantContent = ({
                 variant="destructive"
                 size="sm"
                 onClick={() => setShowEndDialog(true)}
-                disabled={isEndingSession}
+                disabled={isEndingSession === threadId}
               >
-                {isEndingSession ? "Ending..." : "End Chat"}
+                {isEndingSession === threadId ? "Ending..." : "End Chat"}
               </Button>
             )}
           </div>
@@ -289,16 +289,16 @@ const AssistantContent = ({
             <Button
               variant="outline"
               onClick={() => setShowEndDialog(false)}
-              disabled={isEndingSession}
+              disabled={isEndingSession !== null}
             >
               Continue
             </Button>
             <Button
               variant="destructive"
               onClick={handleEndSession}
-              disabled={isEndingSession}
+              disabled={isEndingSession !== null}
             >
-              {isEndingSession ? "Analyzing..." : "End & Analyze"}
+              {isEndingSession !== null ? "Ending..." : "End Chat"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -327,14 +327,17 @@ const AssistantContent = ({
 
           {/* Center Panel - Chat Container */}
           <Panel defaultSize={sizes.center} minSize={30} maxSize={70}>
-            <ChatContainer
-              config={config}
-              selectedModelName={selectedModelName}
-              onSourceClick={(docId, pageNumber) => {
-                setSelectedSourceDoc({ docId, pageNumber });
-                setDocSidebarOpen(true);
-              }}
-            />
+            <div className={`h-full transition-opacity duration-300 ${isEndingSession === threadId ? "opacity-50 pointer-events-none" : ""}`}>
+              <ChatContainer
+                config={config}
+                selectedModelName={selectedModelName}
+                onSourceClick={(docId, pageNumber) => {
+                  setSelectedSourceDoc({ docId, pageNumber });
+                  setDocSidebarOpen(true);
+                }}
+                isSessionEnding={isEndingSession === threadId}
+              />
+            </div>
           </Panel>
 
           {/* Resize Handle between center and right */}

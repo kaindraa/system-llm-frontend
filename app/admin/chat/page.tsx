@@ -8,8 +8,17 @@ import {
   type ChatSession,
   type UserChatsResponse,
 } from "@/lib/services/user";
+import { API_BASE_URL } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const PAGE_SIZE = 50;
 
@@ -32,6 +41,9 @@ export default function AdminChatPage() {
   const [selectedChat, setSelectedChat] = useState<ChatSession | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [isChatDetailsLoading, setIsChatDetailsLoading] = useState(false);
+
+  const [showEndDialog, setShowEndDialog] = useState(false);
+  const [isEndingSession, setIsEndingSession] = useState<string | null>(null); // Store chatId of session being ended
 
   // Load users
   const loadUsers = async (page: number = 1, search?: string) => {
@@ -79,9 +91,8 @@ export default function AdminChatPage() {
     setIsChatDetailsLoading(true);
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-      const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
 
-      const response = await fetch(`${backendUrl}/chat/sessions/${chatId}`, {
+      const response = await fetch(`${API_BASE_URL}/chat/sessions/${chatId}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -134,6 +145,43 @@ export default function AdminChatPage() {
   const handleChatPageChange = (page: number) => {
     if (selectedUserId) {
       loadUserChats(selectedUserId, page);
+    }
+  };
+
+  // Handle end session
+  const handleEndSession = async () => {
+    if (!selectedChatId) return;
+
+    setIsEndingSession(selectedChatId);
+    setShowEndDialog(false);
+
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
+      // Call analysis endpoint to end session and analyze
+      const analysisResponse = await fetch(`${API_BASE_URL}/chat/sessions/${selectedChatId}/analysis`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!analysisResponse.ok) {
+        throw new Error("Failed to end session");
+      }
+
+      const analysisData = await analysisResponse.json();
+      console.log("[AdminChat] Session analysis completed:", analysisData);
+
+      // Close the chat details immediately after successful closure
+      setSelectedChatId(null);
+      setSelectedChat(null);
+      setChatMessages([]);
+    } catch (error) {
+      console.error("[AdminChat] Error ending session:", error);
+      alert("Failed to end session. Please try again.");
+      setIsEndingSession(null);
     }
   };
 
@@ -318,20 +366,35 @@ export default function AdminChatPage() {
         </div>
 
         {/* Right Panel - Chat Details */}
-        <div className="col-span-1 flex flex-col bg-muted/30">
+        <div className={`col-span-1 flex flex-col bg-muted/30 transition-opacity duration-300 ${isEndingSession === selectedChatId ? "opacity-50 pointer-events-none" : ""}`}>
           {selectedChat ? (
             <>
               {/* Chat Header */}
               <div className="p-4 border-b">
-                <h2 className="text-lg font-semibold truncate">{selectedChat.title}</h2>
-                <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                  <span className="capitalize bg-muted px-2 py-1 rounded">
-                    {selectedChat.status}
-                  </span>
-                  {selectedChat.analyzed_at && (
-                    <span className="bg-green-500/20 text-green-700 dark:text-green-400 px-2 py-1 rounded">
-                      ✓ Analyzed
-                    </span>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-lg font-semibold truncate">{selectedChat.title}</h2>
+                    <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                      <span className="capitalize bg-muted px-2 py-1 rounded">
+                        {selectedChat.status}
+                      </span>
+                      {selectedChat.analyzed_at && (
+                        <span className="bg-green-500/20 text-green-700 dark:text-green-400 px-2 py-1 rounded">
+                          ✓ Analyzed
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {selectedChat.status === "active" && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setShowEndDialog(true)}
+                      disabled={isEndingSession === selectedChatId}
+                      className="whitespace-nowrap"
+                    >
+                      {isEndingSession === selectedChatId ? "Ending..." : "End Chat"}
+                    </Button>
                   )}
                 </div>
               </div>
@@ -437,6 +500,34 @@ export default function AdminChatPage() {
           )}
         </div>
       </div>
+
+      {/* End Chat Dialog */}
+      <Dialog open={showEndDialog} onOpenChange={setShowEndDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>End Chat?</DialogTitle>
+            <DialogDescription>
+              Once you end this chat, it cannot be resumed. The session will be analyzed and closed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEndDialog(false)}
+              disabled={isEndingSession !== null}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleEndSession}
+              disabled={isEndingSession !== null}
+            >
+              {isEndingSession !== null ? "Ending..." : "End Chat"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

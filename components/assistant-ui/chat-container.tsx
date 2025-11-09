@@ -30,9 +30,10 @@ interface ChatContainerProps {
   config?: Config | null;
   selectedModelName?: string;
   onSourceClick?: (docId: string, pageNumber: number) => void;
+  isSessionEnding?: boolean;
 }
 
-export const ChatContainer = ({ config, selectedModelName, onSourceClick }: ChatContainerProps) => {
+export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSessionEnding = false }: ChatContainerProps) => {
   const router = useRouter();
   const { threadId, messages: previousMessages, isLoading } = useCurrentThread();
   const { loadConversations } = useConversations();
@@ -595,7 +596,7 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick }: Chat
         onInputChange={setInputValue}
         onKeyDown={handleKeyDown}
         onSubmit={handleSendMessage}
-        disabled={isSending || isCreatingConversation}
+        disabled={isSending || isCreatingConversation || isSessionEnding}
         formRef={formRef as React.RefObject<HTMLFormElement | null>}
       />
     </div>
