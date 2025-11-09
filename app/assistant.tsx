@@ -150,51 +150,64 @@ const AssistantContent = ({
     setShowModelDropdown(false);
   };
 
+  const isModelDisabled = !!threadId; // Disable model selection if chat is created
+
   return (
     <div className="flex h-dvh w-full flex-col bg-background">
         {/* Header */}
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-        <div className="flex items-center gap-2">
+        <header className="flex h-16 shrink-0 items-center gap-4 border-b px-4">
+        {/* Left: System LLM with some spacing */}
+        <div className="flex items-center gap-4 ml-10">
           <span className="text-sm font-medium">System LLM</span>
+          <Separator orientation="vertical" className="h-4" />
         </div>
-        <Separator orientation="vertical" className="mr-2 h-4" />
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem className="hidden md:flex items-center gap-2">
-              <div className="relative" ref={dropdownRef}>
-                <button
-                  onClick={() => setShowModelDropdown(!showModelDropdown)}
-                  className="flex items-center gap-1 px-2 py-1 rounded hover:bg-muted transition-colors"
-                >
-                  <span>Model = {modelName}</span>
-                  <ChevronDown className="h-4 w-4" />
-                </button>
 
-                {/* Model Dropdown Menu */}
-                {showModelDropdown && config && config.models && config.models.length > 0 && (
-                  <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-md shadow-md z-50 min-w-max">
-                    {config.models.map((model) => (
-                      <button
-                        key={model.id}
-                        onClick={() => handleModelSelect(model.display_name)}
-                        className={`w-full text-left px-3 py-2 hover:bg-muted transition-colors ${
-                          modelName === model.display_name ? "bg-muted" : ""
-                        }`}
-                      >
-                        {model.display_name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator className="hidden md:block" />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Prompt = {promptName}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-        {/* User menu and theme toggle on the right */}
+        {/* Center: Model and Prompt */}
+        <div className="flex flex-1 justify-center items-center gap-2">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem className="hidden md:flex items-center gap-2">
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    onClick={() => !isModelDisabled && setShowModelDropdown(!showModelDropdown)}
+                    disabled={isModelDisabled}
+                    className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${
+                      isModelDisabled
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:bg-muted cursor-pointer"
+                    }`}
+                  >
+                    <span>Model = {modelName}</span>
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+
+                  {/* Model Dropdown Menu */}
+                  {showModelDropdown && !isModelDisabled && config && config.models && config.models.length > 0 && (
+                    <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-md shadow-md z-50 min-w-max">
+                      {config.models.map((model) => (
+                        <button
+                          key={model.id}
+                          onClick={() => handleModelSelect(model.display_name)}
+                          className={`w-full text-left px-3 py-2 hover:bg-muted transition-colors ${
+                            modelName === model.display_name ? "bg-muted" : ""
+                          }`}
+                        >
+                          {model.display_name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator className="hidden md:block" />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Prompt = {promptName}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+
+        {/* Right: User menu and theme toggle */}
         <div className="ml-auto flex items-center gap-2">
           <UserMenu />
           <ThemeToggle />
