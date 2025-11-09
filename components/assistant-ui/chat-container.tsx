@@ -5,6 +5,7 @@ import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useCurrentThread } from "@/lib/hooks/useCurrentThread";
 import { useConversations } from "@/lib/hooks/useConversations";
+import { createConversation } from "@/lib/services/conversation";
 import { cn } from "@/lib/utils";
 import { MarkdownRenderer } from "@/components/assistant-ui/markdown-renderer";
 import { RAGSearchIndicator } from "@/components/assistant-ui/rag-search-indicator";
@@ -175,14 +176,6 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick }: Chat
       console.log("[ChatContainer] Creating new conversation...");
       setIsCreatingConversation(true);
       try {
-
-        const token =
-          typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
-        if (!token) {
-          throw new Error("No authentication token");
-        }
-
         const title = messageContent.substring(0, 50);
 
         let modelId = "gpt-4.1-nano";
@@ -193,26 +186,8 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick }: Chat
           modelId = selectedModel?.name || "gpt-4.1-nano";
         }
 
-        const backendUrl =
-          process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
-
-        const createResponse = await fetch(`${backendUrl}/chat/sessions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            title,
-            model_id: modelId,
-          }),
-        });
-
-        if (!createResponse.ok) {
-          throw new Error("Failed to create conversation");
-        }
-
-        const sessionData = await createResponse.json();
+        // Use the updated createConversation function that includes user profile and general prompt
+        const sessionData = await createConversation(title, modelId);
         activeThreadId = sessionData.id;
         navigateToThreadId = sessionData.id;
 

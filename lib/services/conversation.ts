@@ -90,10 +90,60 @@ export async function createConversation(
   title: string = "New Chat",
   modelId: string = "gpt-4.1-nano"
 ): Promise<Conversation> {
+  let prompt_general = "";
+  let task = "";
+  let persona = "";
+  let mission_objective = "";
+
+  // Fetch user profile to get task, persona, mission_objective
+  try {
+    const userResponse = await fetch(`${API_BASE}/auth/me`, {
+      method: "GET",
+      headers: getHeaders(),
+    });
+
+    if (userResponse.ok) {
+      const userData = await userResponse.json();
+      task = userData.task || "";
+      persona = userData.persona || "";
+      mission_objective = userData.mission_objective || "";
+      console.log(
+        "[createConversation] Fetched user profile:",
+        { task, persona, mission_objective }
+      );
+    }
+  } catch (error) {
+    console.warn("[createConversation] Failed to fetch user profile:", error);
+  }
+
+  // Fetch general prompt from RAG settings
+  try {
+    const ragResponse = await fetch(`${API_BASE}/rag/settings`, {
+      method: "GET",
+      headers: getHeaders(),
+    });
+
+    if (ragResponse.ok) {
+      const ragData = await ragResponse.json();
+      prompt_general = ragData.prompt_general || "";
+      console.log("[createConversation] Fetched general prompt:", {
+        prompt_general,
+      });
+    }
+  } catch (error) {
+    console.warn("[createConversation] Failed to fetch general prompt:", error);
+  }
+
   const body = {
     title,
     model_id: modelId,
+    prompt_general,
+    task,
+    persona,
+    mission_objective,
   };
+
+  console.log("[createConversation] Creating session with body:", body);
 
   const response = await fetch(`${API_BASE}/chat/sessions`, {
     method: "POST",
