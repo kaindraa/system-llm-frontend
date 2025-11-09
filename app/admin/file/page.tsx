@@ -97,7 +97,7 @@ export default function FilePage() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-8 px-6 py-6">
       {/* Page Header */}
       <div className="flex flex-col gap-2">
         <div>

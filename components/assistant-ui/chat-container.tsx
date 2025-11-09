@@ -14,7 +14,7 @@ import { ChatInputArea } from "@/components/assistant-ui/chat-input-area";
 import type { RAGSource, RAGSearchState } from "@/lib/types/rag";
 
 interface Message {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
   created_at?: string;
   sources?: RAGSource[];
@@ -332,19 +332,22 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick }: Chat
                         });
                       });
                     } else if (data.status === "completed") {
-                      // Update loading stage to "found"
-                      setLoadingStage("found");
-                      console.log("[ChatContainer] Loading stage: found");
+                      // Add delay to show "searching" stage before changing to "found"
+                      setTimeout(() => {
+                        // Update loading stage to "found"
+                        setLoadingStage("found");
+                        console.log("[ChatContainer] Loading stage: found");
 
-                      // Keep indicator visible with "Found X sources" message
-                      flushSync(() => {
-                        setRagSearchState((prev) => ({
-                          ...prev,
-                          isSearching: false, // Switch from "Searching..." to "Found X sources"
-                          resultsCount: data.results_count,
-                          processingTime: data.processing_time,
-                        }));
-                      });
+                        // Keep indicator visible with "Found X sources" message
+                        flushSync(() => {
+                          setRagSearchState((prev) => ({
+                            ...prev,
+                            isSearching: false, // Switch from "Searching..." to "Found X sources"
+                            resultsCount: data.results_count,
+                            processingTime: data.processing_time,
+                          }));
+                        });
+                      }, 1000);
                     }
                   }
 
@@ -634,11 +637,11 @@ const MessageBubbleComponent = ({
       >
         {/* Analyzing indicator - shown saat message baru dimulai */}
         {!isUser && loadingStage === "analyzing" && (
-          <div className="flex items-center gap-2 text-sm opacity-75">
+          <div className="flex items-center gap-2 text-sm">
             <div className="flex gap-0.5">
-              <div className="w-1 h-1 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
-              <div className="w-1 h-1 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
-              <div className="w-1 h-1 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+              <div className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "0ms" }}></div>
+              <div className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "150ms" }}></div>
+              <div className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" style={{ animationDelay: "300ms" }}></div>
             </div>
             <span>Analyzing</span>
           </div>

@@ -74,14 +74,13 @@ export const RAGSearchIndicator = ({
           </span>
         </>
       ) : isSearching ? (
-        // Searching state - subtle dengan opacity
+        // Searching state - prominent
         <>
-          <div className="flex-shrink-0 opacity-60">
+          <div className="flex-shrink-0">
             <SearchIcon className="h-4 w-4 animate-pulse" />
           </div>
-          <span className="text-xs font-medium opacity-70">
+          <span className="text-xs font-medium">
             Searching documents
-            {query && <span className="opacity-60">: "{query.substring(0, 50)}{query.length > 50 ? "..." : ""}"</span>}
           </span>
         </>
       ) : (
