@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   PanelResizeHandle,
   Panel,
@@ -24,6 +25,15 @@ import { useConversations } from "@/lib/hooks/useConversations";
 import { useResizablePanelSizes } from "@/lib/hooks/useResizablePanelSizes";
 import { getPromptName } from "@/lib/services/conversation";
 import { ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ConfigData {
   models: Array<{ id: string; name: string; display_name: string; provider?: string }>;
@@ -83,6 +93,7 @@ const AssistantContent = ({
   selectedModelName,
   setSelectedModelName,
 }: AssistantContentProps) => {
+  const router = useRouter();
   const { threadId } = useCurrentThread();
   const { conversations } = useConversations();
   const [modelName, setModelName] = useState<string>(selectedModelName);
@@ -90,6 +101,8 @@ const AssistantContent = ({
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [selectedSourceDoc, setSelectedSourceDoc] = useState<{ docId: string; pageNumber: number } | null>(null);
   const [docSidebarOpen, setDocSidebarOpen] = useState(true);
+  const [showEndDialog, setShowEndDialog] = useState(false);
+  const [isEndingSession, setIsEndingSession] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { sizes, saveSizes, isLoading: panelSizesLoading } = useResizablePanelSizes();
 
@@ -152,6 +165,40 @@ const AssistantContent = ({
 
   const isModelDisabled = !!threadId; // Disable model selection if chat is created
 
+  const handleEndSession = async () => {
+    if (!threadId) return;
+
+    setIsEndingSession(true);
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
+
+      const response = await fetch(`${backendUrl}/chat/sessions/${threadId}/analysis`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to end session");
+      }
+
+      const data = await response.json();
+      console.log("[Assistant] Session analysis:", data);
+
+      // Redirect to home or sessions list
+      router.push("/");
+    } catch (error) {
+      console.error("[Assistant] Error ending session:", error);
+      alert("Failed to end session. Please try again.");
+    } finally {
+      setIsEndingSession(false);
+      setShowEndDialog(false);
+    }
+  };
+
   return (
     <div className="flex h-dvh w-full flex-col bg-background">
         {/* Header */}
@@ -162,57 +209,100 @@ const AssistantContent = ({
           <Separator orientation="vertical" className="h-4" />
         </div>
 
-        {/* Center: Model and Prompt */}
+        {/* Center: Model, Prompt and Chat button */}
         <div className="flex flex-1 justify-center items-center gap-2">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem className="hidden md:flex items-center gap-2">
-                <div className="relative" ref={dropdownRef}>
-                  <button
-                    onClick={() => !isModelDisabled && setShowModelDropdown(!showModelDropdown)}
-                    disabled={isModelDisabled}
-                    className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${
-                      isModelDisabled
-                        ? "opacity-50 cursor-not-allowed"
-                        : "hover:bg-muted cursor-pointer"
-                    }`}
-                  >
-                    <span>Model = {modelName}</span>
-                    <ChevronDown className="h-4 w-4" />
-                  </button>
+          <div className="hidden md:flex items-center gap-2">
+            {/* Model selector */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => !isModelDisabled && setShowModelDropdown(!showModelDropdown)}
+                disabled={isModelDisabled}
+                className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${
+                  isModelDisabled
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-muted cursor-pointer"
+                }`}
+              >
+                <span>Model = {modelName}</span>
+                <ChevronDown className="h-4 w-4" />
+              </button>
 
-                  {/* Model Dropdown Menu */}
-                  {showModelDropdown && !isModelDisabled && config && config.models && config.models.length > 0 && (
-                    <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-md shadow-md z-50 min-w-max">
-                      {config.models.map((model) => (
-                        <button
-                          key={model.id}
-                          onClick={() => handleModelSelect(model.display_name)}
-                          className={`w-full text-left px-3 py-2 hover:bg-muted transition-colors ${
-                            modelName === model.display_name ? "bg-muted" : ""
-                          }`}
-                        >
-                          {model.display_name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+              {/* Model Dropdown Menu */}
+              {showModelDropdown && !isModelDisabled && config && config.models && config.models.length > 0 && (
+                <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-md shadow-md z-50 min-w-max">
+                  {config.models.map((model) => (
+                    <button
+                      key={model.id}
+                      onClick={() => handleModelSelect(model.display_name)}
+                      className={`w-full text-left px-3 py-2 hover:bg-muted transition-colors ${
+                        modelName === model.display_name ? "bg-muted" : ""
+                      }`}
+                    >
+                      {model.display_name}
+                    </button>
+                  ))}
                 </div>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden md:block" />
-              <BreadcrumbItem>
-                <BreadcrumbPage>Prompt = {promptName}</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+              )}
+            </div>
+
+            {/* Separator */}
+            <Separator orientation="vertical" className="h-4 bg-border" />
+
+            {/* Prompt display */}
+            <span className="text-sm">Prompt = {promptName}</span>
+
+            {/* Separator before Chat button */}
+            {threadId && <Separator orientation="vertical" className="h-4 bg-border" />}
+
+            {/* End Chat button */}
+            {threadId && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowEndDialog(true)}
+                disabled={isEndingSession}
+              >
+                {isEndingSession ? "Ending..." : "End Chat"}
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Right: User menu and theme toggle */}
         <div className="ml-auto flex items-center gap-2">
+          <Separator orientation="vertical" className="h-4" />
           <UserMenu />
           <ThemeToggle />
         </div>
       </header>
+
+      {/* End Chat Dialog */}
+      <Dialog open={showEndDialog} onOpenChange={setShowEndDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>End Chat?</DialogTitle>
+            <DialogDescription>
+              Once you end this chat, it cannot be resumed. The session will be analyzed and you will not be able to continue the conversation.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEndDialog(false)}
+              disabled={isEndingSession}
+            >
+              Continue
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleEndSession}
+              disabled={isEndingSession}
+            >
+              {isEndingSession ? "Analyzing..." : "End & Analyze"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Main layout with resizable panels */}
       {!panelSizesLoading && (

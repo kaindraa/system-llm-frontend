@@ -43,7 +43,11 @@ export interface ChatSession {
   started_at: string;
   ended_at: string | null;
   model_id: string;
+  model_name: string | null;
   prompt_id: string | null;
+  summary: string | null;
+  comprehension_level: string | null;
+  analyzed_at: string | null;
 }
 
 export interface UserChatsResponse {

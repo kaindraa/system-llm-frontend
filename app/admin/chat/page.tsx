@@ -28,6 +28,11 @@ export default function AdminChatPage() {
   const [currentChatPage, setCurrentChatPage] = useState(1);
   const [isChatsLoading, setIsChatsLoading] = useState(false);
 
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [selectedChat, setSelectedChat] = useState<ChatSession | null>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [isChatDetailsLoading, setIsChatDetailsLoading] = useState(false);
+
   // Load users
   const loadUsers = async (page: number = 1, search?: string) => {
     setIsUsersLoading(true);
@@ -69,10 +74,49 @@ export default function AdminChatPage() {
     loadUsers(1);
   }, []);
 
+  // Load chat details including messages
+  const loadChatDetails = async (chatId: string) => {
+    setIsChatDetailsLoading(true);
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
+
+      const response = await fetch(`${backendUrl}/chat/sessions/${chatId}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load chat details");
+      }
+
+      const data = await response.json();
+      console.log("[AdminChat] Loaded chat details:", data);
+      setSelectedChat(data);
+      setChatMessages(data.messages || []);
+    } catch (error) {
+      console.error("Error loading chat details:", error);
+      alert("Failed to load chat details");
+    } finally {
+      setIsChatDetailsLoading(false);
+    }
+  };
+
   // Handle user selection
   const handleSelectUser = (userId: string) => {
     setSelectedUserId(userId);
+    setSelectedChatId(null);
+    setSelectedChat(null);
     loadUserChats(userId, 1);
+  };
+
+  // Handle chat selection
+  const handleSelectChat = (chat: ChatSession) => {
+    setSelectedChatId(chat.id);
+    loadChatDetails(chat.id);
   };
 
   // Handle user search
@@ -110,8 +154,8 @@ export default function AdminChatPage() {
         </div>
       </div>
 
-      {/* Main Content - Two Panel Layout */}
-      <div className="grid grid-cols-3 gap-6 rounded-lg border bg-card overflow-hidden">
+      {/* Main Content - Three Panel Layout */}
+      <div className="grid grid-cols-3 gap-0 rounded-lg border bg-card overflow-hidden h-[600px]">
         {/* Left Panel - User List */}
         <div className="col-span-1 border-r flex flex-col">
           {/* User Search */}
@@ -184,8 +228,8 @@ export default function AdminChatPage() {
           )}
         </div>
 
-        {/* Right Panel - Chat List */}
-        <div className="col-span-2 flex flex-col">
+        {/* Middle Panel - Chat List */}
+        <div className="col-span-1 border-r flex flex-col">
           {selectedUserId ? (
             <>
               {/* Chat Header */}
@@ -215,24 +259,25 @@ export default function AdminChatPage() {
                 ) : (
                   <div className="divide-y">
                     {chats.map((chat) => (
-                      <div key={chat.id} className="p-4 hover:bg-muted/50 transition-colors">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-sm truncate">{chat.title}</h3>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {chat.total_messages} message(s)
-                            </p>
-                            <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
-                              <span className="capitalize">{chat.status}</span>
-                              <span>•</span>
-                              <span>{new Date(chat.started_at).toLocaleDateString()}</span>
-                            </div>
-                          </div>
-                          <div className="text-xs bg-muted px-2 py-1 rounded whitespace-nowrap">
-                            {chat.model_id}
+                      <button
+                        key={chat.id}
+                        onClick={() => handleSelectChat(chat)}
+                        className={`w-full text-left p-4 hover:bg-muted/50 transition-colors border-l-4 ${
+                          selectedChatId === chat.id ? "bg-muted border-primary" : "border-transparent"
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-sm truncate">{chat.title}</h3>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {chat.total_messages} message(s)
+                          </p>
+                          <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
+                            <span className="capitalize">{chat.status}</span>
+                            <span>•</span>
+                            <span>{new Date(chat.started_at).toLocaleDateString()}</span>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -267,6 +312,126 @@ export default function AdminChatPage() {
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center text-muted-foreground">
                 <p className="text-sm">Select a user to view their chats</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Panel - Chat Details */}
+        <div className="col-span-1 flex flex-col bg-muted/30">
+          {selectedChat ? (
+            <>
+              {/* Chat Header */}
+              <div className="p-4 border-b">
+                <h2 className="text-lg font-semibold truncate">{selectedChat.title}</h2>
+                <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                  <span className="capitalize bg-muted px-2 py-1 rounded">
+                    {selectedChat.status}
+                  </span>
+                  {selectedChat.analyzed_at && (
+                    <span className="bg-green-500/20 text-green-700 dark:text-green-400 px-2 py-1 rounded">
+                      ✓ Analyzed
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Chat Details Content */}
+              <div className="flex-1 overflow-y-auto">
+                {isChatDetailsLoading ? (
+                  <div className="p-6 space-y-4">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <Skeleton key={i} className="h-20 w-full" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 space-y-6">
+                    {/* Analysis Summary Section */}
+                    {selectedChat.summary && (
+                      <div className="space-y-2">
+                        <h3 className="font-semibold text-sm">Analysis Summary</h3>
+                        <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
+                          {selectedChat.summary}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Comprehension Level */}
+                    {selectedChat.comprehension_level && (
+                      <div className="space-y-2">
+                        <h3 className="font-semibold text-sm">Comprehension Level</h3>
+                        <div className={`text-sm font-medium px-3 py-2 rounded text-center ${
+                          selectedChat.comprehension_level === "HIGH"
+                            ? "bg-green-500/20 text-green-700 dark:text-green-400"
+                            : selectedChat.comprehension_level === "MEDIUM"
+                            ? "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400"
+                            : "bg-red-500/20 text-red-700 dark:text-red-400"
+                        }`}>
+                          {selectedChat.comprehension_level}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Chat Info */}
+                    <div className="space-y-2 text-xs pt-4 border-t">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Model:</span>
+                        <span className="font-medium">{selectedChat.model_name || selectedChat.model_id}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Messages:</span>
+                        <span className="font-medium">{selectedChat.total_messages}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Started:</span>
+                        <span className="font-medium">
+                          {new Date(selectedChat.started_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      {selectedChat.ended_at && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Ended:</span>
+                          <span className="font-medium">
+                            {new Date(selectedChat.ended_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+                      {selectedChat.analyzed_at && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Analyzed:</span>
+                          <span className="font-medium">
+                            {new Date(selectedChat.analyzed_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Messages */}
+                    {chatMessages.length > 0 && (
+                      <div className="space-y-2 pt-4 border-t">
+                        <h3 className="font-semibold text-sm">Messages</h3>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {chatMessages.slice(-5).map((msg, idx) => (
+                            <div key={idx} className="text-xs p-2 rounded bg-background">
+                              <div className="font-medium capitalize text-muted-foreground mb-1">
+                                {msg.role}
+                              </div>
+                              <div className="text-foreground line-clamp-2">
+                                {msg.content}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center text-muted-foreground">
+                <p className="text-sm">Select a chat to view details</p>
               </div>
             </div>
           )}
