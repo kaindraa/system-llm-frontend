@@ -107,9 +107,19 @@ const AssistantContent = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { sizes, saveSizes, isLoading: panelSizesLoading } = useResizablePanelSizes();
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastAnalyzedStatusRef = useRef<boolean>(false);
 
   // Get current conversation details
   const currentConversation = conversations.find((c) => c.id === threadId);
+
+  // Reset session states when threadId changes
+  useEffect(() => {
+    // Reset ending and analyzed states when navigating to different chat
+    setIsEndingSession(null);
+    setIsSessionAnalyzed(false);
+    setShowEndDialog(false);
+    lastAnalyzedStatusRef.current = false;
+  }, [threadId]);
 
   // Update model and prompt names based on thread context
   useEffect(() => {
@@ -168,7 +178,9 @@ const AssistantContent = ({
           const data = await response.json();
           // Check if session status is "analyzed"
           const isAnalyzed = data.status === "analyzed";
-          if (isAnalyzed !== isSessionAnalyzed) {
+          // Only update state if status changed (avoid unnecessary re-renders)
+          if (isAnalyzed !== lastAnalyzedStatusRef.current) {
+            lastAnalyzedStatusRef.current = isAnalyzed;
             setIsSessionAnalyzed(isAnalyzed);
             if (isAnalyzed) {
               console.log("[Assistant] Session status: analyzed");
@@ -311,9 +323,9 @@ const AssistantContent = ({
                 variant="destructive"
                 size="sm"
                 onClick={() => setShowEndDialog(true)}
-                disabled={isEndingSession === threadId}
+                disabled={isEndingSession === threadId || isSessionAnalyzed}
               >
-                {isEndingSession === threadId ? "Ending..." : "End Chat"}
+                {isEndingSession === threadId ? "Ending..." : isSessionAnalyzed ? "Chat Ended" : "End Chat"}
               </Button>
             )}
           </div>
@@ -328,7 +340,12 @@ const AssistantContent = ({
       </header>
 
       {/* End Chat Dialog */}
-      <Dialog open={showEndDialog} onOpenChange={setShowEndDialog}>
+      <Dialog open={showEndDialog} onOpenChange={(open) => {
+        // Prevent closing dialog while ending session
+        if (isEndingSession === null) {
+          setShowEndDialog(open);
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>End Chat?</DialogTitle>
