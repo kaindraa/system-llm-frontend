@@ -378,7 +378,7 @@ const AssistantContent = ({
 
           {/* Center Panel - Chat Container */}
           <Panel defaultSize={sizes.center} minSize={30} maxSize={70}>
-            <div className={`h-full transition-opacity duration-300 ${isEndingSession === threadId || isSessionAnalyzed ? "opacity-50 pointer-events-none" : ""}`}>
+            <div className={`h-full transition-opacity duration-300 ${threadId && (isEndingSession === threadId || isSessionAnalyzed) ? "opacity-50 pointer-events-none" : ""}`}>
               <ChatContainer
                 config={config}
                 selectedModelName={selectedModelName}
@@ -386,7 +386,7 @@ const AssistantContent = ({
                   setSelectedSourceDoc({ docId, pageNumber });
                   setDocSidebarOpen(true);
                 }}
-                isSessionEnding={isEndingSession === threadId || isSessionAnalyzed}
+                isSessionEnding={threadId && (isEndingSession === threadId || isSessionAnalyzed)}
               />
             </div>
           </Panel>
