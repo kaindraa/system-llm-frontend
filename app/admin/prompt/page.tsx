@@ -247,6 +247,51 @@ export default function PromptPage() {
         </p>
       </div>
 
+      {/* Specific Prompt Section */}
+      <div className="flex flex-col gap-4">
+        <h2 className="text-2xl font-bold tracking-tight">Specific Prompt</h2>
+
+        {/* Search and Filters Card with Create Button */}
+        <div className="rounded-lg border bg-card p-4">
+          <div className="flex gap-2 items-center">
+            <input
+              type="text"
+              placeholder="Search by name or description..."
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="flex-1 rounded-md border border-input bg-background px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            />
+            <Button
+              onClick={() => handleOpenForm()}
+              size="default"
+              className="gap-2 flex-shrink-0"
+            >
+              <Plus className="h-4 w-4" />
+              Create Prompt
+            </Button>
+          </div>
+        </div>
+
+        {/* Content Card */}
+        <div className="rounded-lg border bg-card">
+          {/* Prompt List */}
+          <div className="p-6">
+            <PromptList
+              prompts={prompts}
+              total={total}
+              currentPage={currentPage}
+              pageSize={PAGE_SIZE}
+              isLoading={isLoading}
+              onEdit={(prompt) => handleOpenForm(prompt)}
+              onDelete={handleDelete}
+              onActivate={handleActivate}
+              onCreateNew={() => handleOpenForm()}
+              onPageChange={handlePageChange}
+            />
+          </div>
+        </div>
+      </div>
+
       {/* General Prompt Section */}
       {chatConfig && (
         <div className="rounded-lg border bg-card overflow-hidden">
@@ -388,46 +433,6 @@ export default function PromptPage() {
               </Button>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Search and Filters Card with Create Button */}
-      <div className="rounded-lg border bg-card p-4">
-        <div className="flex gap-2 items-center">
-          <input
-            type="text"
-            placeholder="Search by name or description..."
-            value={searchTerm}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="flex-1 rounded-md border border-input bg-background px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          />
-          <Button
-            onClick={() => handleOpenForm()}
-            size="default"
-            className="gap-2 flex-shrink-0"
-          >
-            <Plus className="h-4 w-4" />
-            Create Prompt
-          </Button>
-        </div>
-      </div>
-
-      {/* Content Card */}
-      <div className="rounded-lg border bg-card">
-        {/* Prompt List */}
-        <div className="p-6">
-          <PromptList
-            prompts={prompts}
-            total={total}
-            currentPage={currentPage}
-            pageSize={PAGE_SIZE}
-            isLoading={isLoading}
-            onEdit={(prompt) => handleOpenForm(prompt)}
-            onDelete={handleDelete}
-            onActivate={handleActivate}
-            onCreateNew={() => handleOpenForm()}
-            onPageChange={handlePageChange}
-          />
         </div>
       </div>
 
