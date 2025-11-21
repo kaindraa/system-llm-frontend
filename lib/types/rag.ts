@@ -120,6 +120,57 @@ export interface RAGSearchState {
 }
 
 /**
+ * Refined prompt event during streaming
+ * Emitted by backend when LLM is refining the user's prompt
+ */
+export interface RefinedPromptEvent {
+  /** Original prompt text before refinement */
+  original_prompt?: string;
+
+  /** Status: "refining" while in progress */
+  status: "refining" | "completed";
+
+  /** Error message if refinement failed */
+  error?: string;
+}
+
+/**
+ * Refined prompt result after tool execution
+ * Contains both original and refined versions
+ */
+export interface RefinedPromptResult {
+  /** Original prompt as entered by user */
+  original: string;
+
+  /** Refined/improved prompt from LLM */
+  refined: string;
+
+  /** Whether refinement was successful */
+  success: boolean;
+
+  /** Error message if refinement failed */
+  error?: string;
+}
+
+/**
+ * Refined prompt state in chat component
+ * Tracks refinement operation
+ */
+export interface RefinedPromptState {
+  /** Whether prompt is currently being refined */
+  isRefining: boolean;
+
+  /** Original prompt being refined */
+  originalPrompt?: string;
+
+  /** Result after refinement (if completed) */
+  result?: RefinedPromptResult;
+
+  /** Error message if refinement failed */
+  error?: string;
+}
+
+/**
  * Streaming event from backend
  * Used to parse Server-Sent Events (SSE) from chat endpoint
  */
@@ -127,6 +178,8 @@ export interface StreamingEvent {
   /** Event type identifier */
   type:
     | "user_message"
+    | "refine_prompt"
+    | "refine_prompt_result"
     | "rag_search"
     | "chunk"
     | "done"

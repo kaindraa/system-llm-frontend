@@ -219,6 +219,43 @@ export async function POST(req: Request) {
                       continue;
                     }
 
+                    // Handle refined prompt events - forward directly to frontend
+                    if (currentEventType === "refine_prompt") {
+                      console.log("[API Route] ✓ Refine prompt event detected! Status:", data.status);
+                      const refinedPromptResponse = {
+                        type: "refine_prompt",
+                        content: {
+                          original_prompt: data.original_prompt,
+                          status: data.status,
+                          error: data.error,
+                        },
+                      };
+                      console.log("[API Route] Forwarding refine_prompt to frontend:", refinedPromptResponse);
+                      controller.enqueue(
+                        encoder.encode(`data: ${JSON.stringify(refinedPromptResponse)}\n\n`)
+                      );
+                      continue;
+                    }
+
+                    // Handle refined prompt result events - forward directly to frontend
+                    if (currentEventType === "refine_prompt_result") {
+                      console.log("[API Route] ✓ Refine prompt result event detected!");
+                      const refinedPromptResultResponse = {
+                        type: "refine_prompt_result",
+                        content: {
+                          original: data.original,
+                          refined: data.refined,
+                          success: data.success,
+                          error: data.error,
+                        },
+                      };
+                      console.log("[API Route] Forwarding refine_prompt_result to frontend:", refinedPromptResultResponse);
+                      controller.enqueue(
+                        encoder.encode(`data: ${JSON.stringify(refinedPromptResultResponse)}\n\n`)
+                      );
+                      continue;
+                    }
+
                     // Handle RAG search events - forward directly to frontend
                     if (currentEventType === "rag_search") {
                       console.log("[API Route] ✓ RAG search event detected! Status:", data.status, "Query:", data.query);

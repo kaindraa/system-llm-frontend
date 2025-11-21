@@ -28,12 +28,13 @@ interface RAGSearchIndicatorProps {
  * RAGSearchIndicator Component
  *
  * Displays loading state when LLM is searching documents via RAG tool.
- * Shows animated indicator while searching, then displays results summary.
+ * Shows animated indicator ONLY while searching, then hides automatically.
+ * Found results are shown via source badges instead.
  *
  * States:
  * - Idle: hidden
- * - Searching: animated loader with query
- * - Found: success state with result count and processing time
+ * - Searching documents: animated loader with query
+ * - Auto-hides when search completes
  * - Error: error message display
  */
 export const RAGSearchIndicator = ({
@@ -44,8 +45,9 @@ export const RAGSearchIndicator = ({
   error,
   className,
 }: RAGSearchIndicatorProps) => {
-  // Show if: searching, has error, OR found results
-  const shouldShow = isSearching || error || (resultsCount && resultsCount > 0);
+  // Show ONLY if: actively searching OR has error
+  // Hide automatically once search completes (no "Found X sources" state here)
+  const shouldShow = isSearching || error;
 
   if (!shouldShow) {
     return null;
@@ -58,40 +60,29 @@ export const RAGSearchIndicator = ({
         "transition-all duration-300 ease-in-out",
         // Styling berubah tergantung state
         isSearching
-          ? "bg-transparent border border-dashed border-blue-300 text-blue-600 dark:border-blue-700 dark:text-blue-400 opacity-60"
-          : "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-200 opacity-100",
+          ? "bg-transparent border border-dashed border-blue-300 text-blue-600 dark:border-blue-700 dark:text-blue-400 opacity-70"
+          : "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-200 opacity-100",
         className
       )}
     >
       {error ? (
-        // Error state - red
+        // Error state - red (Search failed)
         <>
           <div className="flex-shrink-0">
-            <div className="h-4 w-4 rounded-full bg-red-400 dark:bg-red-500" />
+            <div className="h-4 w-4 rounded-full bg-red-500" />
           </div>
           <span className="text-red-600 dark:text-red-300 text-xs font-medium">
-            Search failed: {error}
+            Searching sources failed
           </span>
         </>
-      ) : isSearching ? (
-        // Searching state - prominent
+      ) : (
+        // Searching state - blue dashed
         <>
           <div className="flex-shrink-0">
             <SearchIcon className="h-4 w-4 animate-pulse" />
           </div>
           <span className="text-xs font-medium">
-            Searching documents
-          </span>
-        </>
-      ) : (
-        // Found state - prominent dengan full opacity
-        <>
-          <div className="flex-shrink-0">
-            <CheckCircle2Icon className="h-4 w-4" />
-          </div>
-          <span className="text-xs font-medium">
-            Found {resultsCount || 0} source{(resultsCount || 0) !== 1 ? "s" : ""}
-            {processingTime && <span className="opacity-75"> in {(processingTime / 1000).toFixed(2)}s</span>}
+            Searching sources
           </span>
         </>
       )}
