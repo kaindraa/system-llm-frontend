@@ -40,6 +40,13 @@ export default function PromptPage() {
   const [analysisPromptError, setAnalysisPromptError] = useState<string | null>(null);
   const [analysisPromptSuccess, setAnalysisPromptSuccess] = useState<string | null>(null);
 
+  // Refine prompt state
+  const [refinePrompt, setRefinePrompt] = useState("");
+  const [isEditingRefine, setIsEditingRefine] = useState(false);
+  const [isSavingRefine, setIsSavingRefine] = useState(false);
+  const [refinePromptError, setRefinePromptError] = useState<string | null>(null);
+  const [refinePromptSuccess, setRefinePromptSuccess] = useState<string | null>(null);
+
   // Load prompts
   const loadPrompts = async (page: number = 1, search?: string) => {
     setIsLoading(true);
@@ -156,11 +163,59 @@ export default function PromptPage() {
     loadAnalysisPrompt();
   };
 
+  // Load refine prompt
+  const loadRefinePrompt = async () => {
+    try {
+      console.log("[Prompt Page] Loading refine prompt...");
+      const config = await ragService.getChatConfig();
+      console.log("[Prompt Page] Full chat config received:", config);
+      console.log("[Prompt Page] prompt_refine value:", config.prompt_refine);
+      console.log("[Prompt Page] prompt_refine type:", typeof config.prompt_refine);
+      setRefinePrompt(config.prompt_refine || "");
+      setRefinePromptError(null);
+      console.log("[Prompt Page] Refine prompt state set successfully");
+    } catch (error) {
+      console.error("[Prompt Page] Error loading refine prompt:", error);
+      setRefinePromptError("Failed to load refine prompt");
+      setRefinePrompt("");
+    }
+  };
+
+  // Save refine prompt
+  const handleSaveRefinePrompt = async () => {
+    setIsSavingRefine(true);
+    setRefinePromptError(null);
+    setRefinePromptSuccess(null);
+    try {
+      await ragService.updateChatConfig({ prompt_refine: refinePrompt });
+      setRefinePromptSuccess("Refine prompt saved successfully");
+      setIsEditingRefine(false);
+      await loadRefinePrompt();
+      // Clear success message after 3 seconds
+      setTimeout(() => setRefinePromptSuccess(null), 3000);
+    } catch (error) {
+      console.error("Error saving refine prompt:", error);
+      setRefinePromptError(
+        error instanceof Error ? error.message : "Failed to save refine prompt"
+      );
+    } finally {
+      setIsSavingRefine(false);
+    }
+  };
+
+  const handleCancelEditRefine = () => {
+    setIsEditingRefine(false);
+    setRefinePromptError(null);
+    // Reload to reset the value
+    loadRefinePrompt();
+  };
+
   // Initial load
   useEffect(() => {
     loadPrompts(1);
     loadGeneralPrompt();
     loadAnalysisPrompt();
+    loadRefinePrompt();
   }, []);
 
   // Handle create/update
@@ -425,6 +480,77 @@ export default function PromptPage() {
               </div>
               <Button
                 onClick={() => setIsEditingAnalysis(true)}
+                variant="outline"
+                className="gap-2"
+              >
+                <Edit className="h-4 w-4" />
+                Edit Prompt
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Refine Prompt Section */}
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="bg-gradient-to-r from-cyan-500/10 to-cyan-500/5 px-6 py-4 border-b">
+          <h2 className="text-xl font-semibold text-foreground">Refine Prompt</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            This prompt is used to refine and improve user queries
+          </p>
+        </div>
+
+        <div className="p-6">
+          {refinePromptError && (
+            <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm">
+              {refinePromptError}
+            </div>
+          )}
+
+          {refinePromptSuccess && (
+            <div className="mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-700 text-sm">
+              {refinePromptSuccess}
+            </div>
+          )}
+
+          {isEditingRefine ? (
+            <div className="space-y-4">
+              <textarea
+                value={refinePrompt}
+                onChange={(e) => setRefinePrompt(e.target.value)}
+                placeholder="Enter the refine prompt that will be used to improve user queries..."
+                rows={8}
+                className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleSaveRefinePrompt}
+                  disabled={isSavingRefine}
+                  className="gap-2"
+                >
+                  {isSavingRefine && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isSavingRefine ? "Saving..." : "Save"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleCancelEditRefine}
+                  disabled={isSavingRefine}
+                  className="gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-4 bg-muted rounded-lg border border-input min-h-32">
+                <p className="text-sm text-foreground whitespace-pre-wrap">
+                  {refinePrompt || "(No refine prompt set)"}
+                </p>
+              </div>
+              <Button
+                onClick={() => setIsEditingRefine(true)}
                 variant="outline"
                 className="gap-2"
               >

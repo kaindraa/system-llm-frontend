@@ -7,6 +7,7 @@ export interface ChatConfig {
   id: number;
   prompt_general: string;
   prompt_analysis?: string;
+  prompt_refine?: string;
   default_top_k: number;
   max_top_k: number;
   similarity_threshold: number;
@@ -19,6 +20,7 @@ export interface ChatConfig {
 export interface ChatConfigUpdateRequest {
   prompt_general?: string;
   prompt_analysis?: string;
+  prompt_refine?: string;
   default_top_k?: number;
   max_top_k?: number;
   similarity_threshold?: number;
