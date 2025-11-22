@@ -92,6 +92,13 @@ function parseRealMessages(rawMessages: any[]): Message[] {
       return; // Skip system and tool messages in final output
     }
 
+    // Skip empty assistant messages (those with tool_calls but no content)
+    // These are intermediate messages during tool execution
+    if (msg.role === "assistant" && !msg.content) {
+      console.log(`[parseRealMessages] Skipping empty assistant message #${idx} (has tool_calls)`);
+      return;
+    }
+
     const baseMsg: Message = {
       role: (msg.role || "user") as "system" | "user" | "assistant" | "tool",
       content: typeof msg.content === "string" ? msg.content : "",

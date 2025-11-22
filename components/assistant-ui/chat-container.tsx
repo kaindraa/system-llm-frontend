@@ -344,18 +344,19 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
 
                   // Handle refined prompt event
                   if (data.type === "refine_prompt") {
-                    console.log("[ChatContainer] Refine prompt event:", data);
+                    console.log("[ChatContainer] ✅ Refine prompt event received:", data);
                     flushSync(() => {
                       setRefinedPromptState({
                         isRefining: true,
                         originalPrompt: data.content?.original_prompt,
                       });
                     });
+                    console.log("[ChatContainer] Refine prompt state updated - indicator should show");
                   }
 
                   // Handle refined prompt result event
                   if (data.type === "refine_prompt_result") {
-                    console.log("[ChatContainer] Refine prompt result:", data);
+                    console.log("[ChatContainer] ✅ Refine prompt result event received:", data);
                     const result: RefinedPromptResult = {
                       original: data.content?.original || "",
                       refined: data.content?.refined || "",
@@ -391,8 +392,10 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
 
                   // Handle RAG search event - with synchronous flush for real-time indicator
                   if (data.type === "rag_search") {
-                    console.log("[ChatContainer] RAG search:", data.status, "query:", data.query);
+                    console.log("[ChatContainer] ✅ RAG search event received:", { status: data.status, query: data.query });
                     if (data.status === "searching") {
+                      // Record timestamp when search started (for guaranteed min display time)
+                      const searchStartTime = Date.now();
                       // Update loading stage to "searching"
                       setLoadingStage("searching");
                       console.log("[ChatContainer] Loading stage: searching");
@@ -402,8 +405,10 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
                         setRagSearchState({
                           isSearching: true,
                           query: data.query,
+                          searchStartTime, // Track when search started
                         });
                       });
+                      console.log("[ChatContainer] RAG search state updated - 'Searching sources' indicator should show");
 
                       // Mark message as searched
                       flushSync(() => {
@@ -419,9 +424,16 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
                         });
                       });
                     } else if (data.status === "completed") {
-                      // Add delay to show "searching" stage for minimum 1 second
+                      // Calculate how long we've been showing the indicator
+                      const elapsedTime = Date.now() - (ragSearchState?.searchStartTime || Date.now());
+                      const minimumDisplayTime = 1500; // 1.5 seconds minimum
+                      const delayNeeded = Math.max(0, minimumDisplayTime - elapsedTime);
+
+                      console.log(`[ChatContainer] RAG search completed. Elapsed: ${elapsedTime}ms, delaying hide by: ${delayNeeded}ms`);
+
+                      // Add delay to guarantee minimum display time
                       setTimeout(() => {
-                        console.log("[ChatContainer] RAG search completed, hiding indicator after 1s");
+                        console.log("[ChatContainer] RAG search completed, hiding indicator");
                         // Hide indicator - results shown via source badges in message
                         flushSync(() => {
                           setRagSearchState((prev) => ({
@@ -431,10 +443,14 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
                             processingTime: data.processing_time,
                           }));
                         });
-                      }, 1000);
+                      }, delayNeeded);
                     } else if (data.error) {
                       // RAG search error
                       console.log("[ChatContainer] RAG search error:", data.error);
+                      const elapsedTime = Date.now() - (ragSearchState?.searchStartTime || Date.now());
+                      const minimumDisplayTime = 1500; // 1.5 seconds minimum
+                      const delayNeeded = Math.max(0, minimumDisplayTime - elapsedTime);
+
                       setTimeout(() => {
                         flushSync(() => {
                           setRagSearchState((prev) => ({
@@ -443,7 +459,7 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
                             error: data.error,
                           }));
                         });
-                      }, 1000);
+                      }, delayNeeded);
                     }
                   }
 
