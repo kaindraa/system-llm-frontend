@@ -21,19 +21,10 @@ export const ThreadList: FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch conversations on mount
+  // Fetch conversations on mount only
   useEffect(() => {
     loadConversationsLocal();
   }, []);
-
-  // Auto-refresh when URL changes (new thread navigated)
-  useEffect(() => {
-    if (currentThreadId) {
-      console.log("[ThreadList] URL changed to thread:", currentThreadId);
-      console.log("[ThreadList] Auto-refreshing sidebar...");
-      loadConversationsLocal();
-    }
-  }, [currentThreadId]);
 
   const loadConversationsLocal = async () => {
     try {

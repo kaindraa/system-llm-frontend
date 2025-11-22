@@ -16,13 +16,21 @@ import { RefinedPromptResultComponent } from "@/components/assistant-ui/refined-
 import { ChatInputArea } from "@/components/assistant-ui/chat-input-area";
 import type { RAGSource, RAGSearchState, RefinedPromptState, RefinedPromptResult } from "@/lib/types/rag";
 
+interface ToolCall {
+  name: string;
+  args: Record<string, any>;
+  id?: string;
+}
+
 interface Message {
-  role: "user" | "assistant" | "system";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
   created_at?: string;
   sources?: RAGSource[];
   ragSearched?: boolean;
   refinedPrompt?: RefinedPromptResult;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
 }
 
 interface Config {
@@ -83,8 +91,12 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
       console.log("[ChatContainer] No threadId, clearing local messages for new chat");
       setMessages([]);
     } else if (previousMessages && previousMessages.length > 0) {
-      // ThreadId exists, sync with backend messages (including sources and metadata)
+      // ThreadId exists, sync with backend messages (including sources, tool_calls, refined prompts, and metadata)
       console.log("[ChatContainer] Loading messages for thread:", threadId, "message count:", previousMessages.length);
+      console.log("[ChatContainer] previousMessages sample:", {
+        userMsg: previousMessages.find(m => m.role === "user"),
+        assistantMsg: previousMessages.find(m => m.role === "assistant"),
+      });
       const syncedMessages = (previousMessages as unknown as Array<Record<string, unknown>>).map((msg) => {
         const sources = msg.sources as Array<Record<string, unknown>> | undefined;
         const normalizedSources = sources?.map((src) => ({
@@ -94,16 +106,36 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
           similarity_score: Number(src.similarity_score ?? 0.85),
           chunk_index: src.chunk_index as number | undefined,
         }));
+
+        // Extract tool_calls if present
+        const toolCalls = (msg.tool_calls as Array<Record<string, any>> | undefined)?.map((tc) => ({
+          name: (tc.name as string) || "",
+          args: (tc.args as Record<string, any>) || {},
+          id: (tc.id as string) || undefined,
+        }));
+
+        // Extract refined prompt if present
+        const refinedPrompt = msg.refinedPrompt as Record<string, any> | undefined;
+        const normalizedRefinedPrompt = refinedPrompt ? {
+          original: (refinedPrompt.original as string) || "",
+          refined: (refinedPrompt.refined as string) || "",
+          success: (refinedPrompt.success as boolean) !== false,
+          error: (refinedPrompt.error as string) || undefined,
+        } : undefined;
+
         return {
-          role: (msg.role as "user" | "assistant") || "user",
+          role: (msg.role as "system" | "user" | "assistant" | "tool") || "user",
           content: typeof msg.content === "string" ? msg.content : "",
           created_at: (msg.created_at as string) || new Date().toISOString(),
           sources: normalizedSources,
           ragSearched: (msg.ragSearched as boolean) || false,
+          tool_calls: toolCalls,
+          tool_call_id: (msg.tool_call_id as string) || undefined,
+          refinedPrompt: normalizedRefinedPrompt,
         };
       });
       setMessages(syncedMessages);
-      console.log("[ChatContainer] Messages synced, count:", syncedMessages.length, "with sources");
+      console.log("[ChatContainer] Messages synced, count:", syncedMessages.length, "with sources, tool calls, and refined prompts");
     } else {
       console.log("[ChatContainer] ThreadId exists but no previousMessages yet (still loading?)");
     }
@@ -461,11 +493,13 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
                     });
                   }
 
-                  // Handle done event with sources
+                  // Handle done event with sources and tool_calls
                   if (data.type === "done") {
                     console.log("[ChatContainer] ✅ DONE event received!");
                     console.log("[ChatContainer] Done event data:", data);
                     console.log("[ChatContainer] data.sources:", data.sources);
+                    console.log("[ChatContainer] data.tool_calls:", data.tool_calls);
+
                     // Extract sources from response if available
                     if (data.sources && Array.isArray(data.sources)) {
                       console.log("[ChatContainer] Processing", data.sources.length, "sources from done event");
@@ -480,7 +514,19 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
                       console.log("[ChatContainer] No sources in done event or sources is not array");
                     }
 
-                    // Update final message with sources
+                    // Extract tool_calls if present
+                    let toolCallsData: ToolCall[] = [];
+                    if (data.tool_calls && Array.isArray(data.tool_calls)) {
+                      console.log("[ChatContainer] Processing", data.tool_calls.length, "tool calls from done event");
+                      toolCallsData = (data.tool_calls as Array<Record<string, any>>).map((tc) => ({
+                        name: (tc.name as string) || "",
+                        args: (tc.args as Record<string, any>) || {},
+                        id: (tc.id as string) || undefined,
+                      }));
+                      console.log("[ChatContainer] Mapped tool_calls:", toolCallsData);
+                    }
+
+                    // Update final message with sources and tool_calls
                     const finalContent = data.content || assistantContent;
                     setMessages((prev) => {
                       const updated = [...prev];
@@ -489,6 +535,7 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
                           ...updated[updated.length - 1],
                           sources: currentSources,
                           content: finalContent,
+                          tool_calls: toolCallsData.length > 0 ? toolCallsData : undefined,
                         };
                       }
                       return updated;
@@ -760,7 +807,11 @@ const MessageBubbleComponent = ({
                     const tools: string[] = [];
                     if (message.refinedPrompt) tools.push("Refine Prompt");
                     if (message.sources && message.sources.length > 0) tools.push("Semantic Search");
-                    return tools.length > 0 ? `, used ${tools.join(" and ")} tool` : "";
+                    if (message.tool_calls && message.tool_calls.length > 0) {
+                      const toolNames = message.tool_calls.map(tc => tc.name).filter((name, idx, arr) => arr.indexOf(name) === idx);
+                      tools.push(...toolNames);
+                    }
+                    return tools.length > 0 ? `, used ${tools.join(" and ")}` : "";
                   })()}
                 </span>
               </div>
