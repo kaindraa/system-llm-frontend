@@ -3,7 +3,6 @@
 import type { FC } from "react";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
   MessageSquare,
   Sparkles,
   FileText,
@@ -18,11 +17,6 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  {
-    name: "Dashboard",
-    href: "/admin/dashboard",
-    icon: <LayoutDashboard className="h-4 w-4" />,
-  },
   {
     name: "Chat",
     href: "/admin/chat",
