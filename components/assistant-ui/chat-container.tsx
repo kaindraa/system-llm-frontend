@@ -47,7 +47,7 @@ interface ChatContainerProps {
 
 export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSessionEnding = false }: ChatContainerProps) => {
   const router = useRouter();
-  const { threadId, messages: previousMessages, isLoading } = useCurrentThread();
+  const { threadId, messages: previousMessages, isLoading, sessionMetadata } = useCurrentThread();
   const { loadConversations } = useConversations();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -719,13 +719,70 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Session Closed - Analysis Summary Section */}
+      {sessionMetadata?.status === "analyzed" && (
+        <div className="px-4 py-4 border-t bg-muted/50">
+          <div className="max-w-2xl mx-auto space-y-3">
+            {/* Status Badge */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-green-500/20">
+                <span className="text-xs font-bold text-green-700 dark:text-green-400">✓</span>
+              </div>
+              <span className="text-sm font-medium text-foreground">Chat Selesai dan Telah Dianalisis</span>
+              {sessionMetadata.analyzed_at && (
+                <span className="text-xs text-muted-foreground">
+                  ({new Date(sessionMetadata.analyzed_at).toLocaleDateString("id-ID")})
+                </span>
+              )}
+            </div>
+
+            {/* Comprehension Level Badge */}
+            {sessionMetadata.comprehension_level && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground">Tingkat Pemahaman:</span>
+                <div
+                  className={`text-sm font-bold px-3 py-1 rounded-full ${
+                    sessionMetadata.comprehension_level === "high"
+                      ? "bg-green-500/20 text-green-700 dark:text-green-400"
+                      : sessionMetadata.comprehension_level === "medium"
+                      ? "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400"
+                      : "bg-red-500/20 text-red-700 dark:text-red-400"
+                  }`}
+                >
+                  {sessionMetadata.comprehension_level === "high"
+                    ? "Tinggi ✓"
+                    : sessionMetadata.comprehension_level === "medium"
+                    ? "Sedang"
+                    : "Rendah"}
+                </div>
+              </div>
+            )}
+
+            {/* Summary */}
+            {sessionMetadata.summary && (
+              <div className="bg-background rounded-lg border p-3 space-y-2">
+                <h3 className="text-sm font-semibold text-foreground">Ringkasan Analisis:</h3>
+                <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                  {sessionMetadata.summary}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Input area - memoized component for smooth typing */}
       <ChatInputArea
         inputValue={inputValue}
         onInputChange={setInputValue}
         onKeyDown={handleKeyDown}
         onSubmit={handleSendMessage}
-        disabled={isSending || isCreatingConversation || isSessionEnding}
+        disabled={
+          isSending ||
+          isCreatingConversation ||
+          isSessionEnding ||
+          sessionMetadata?.status === "analyzed"
+        }
         formRef={formRef as React.RefObject<HTMLFormElement | null>}
       />
     </div>

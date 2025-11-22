@@ -154,6 +154,15 @@ function parseRealMessages(rawMessages: any[]): Message[] {
   return formattedMessages;
 }
 
+export interface SessionMetadata {
+  id: string;
+  status: "active" | "analyzed";
+  summary?: string;
+  comprehension_level?: "low" | "medium" | "high";
+  analyzed_at?: string;
+  title?: string;
+}
+
 export const useCurrentThread = () => {
   const searchParams = useSearchParams();
   const threadId = searchParams.get("thread");
@@ -161,6 +170,7 @@ export const useCurrentThread = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionMetadata, setSessionMetadata] = useState<SessionMetadata | null>(null);
 
   // Load messages for the current thread
   const loadMessages = useCallback(async (conversationId: string) => {
@@ -207,6 +217,16 @@ export const useCurrentThread = () => {
       const messagesData = data.real_messages || data.messages || [];
       console.log("[useCurrentThread] Loaded conversation data, real_messages count:", messagesData.length);
 
+      // Extract session metadata
+      setSessionMetadata({
+        id: data.id,
+        status: data.status || "active",
+        summary: data.summary,
+        comprehension_level: data.comprehension_level,
+        analyzed_at: data.analyzed_at,
+        title: data.title,
+      });
+
       // Transform backend messages using helper function
       if (messagesData && Array.isArray(messagesData) && messagesData.length > 0) {
         const formattedMessages = parseRealMessages(messagesData);
@@ -245,5 +265,6 @@ export const useCurrentThread = () => {
     isLoading,
     error,
     loadMessages,
+    sessionMetadata,
   };
 };
