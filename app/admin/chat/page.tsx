@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   listUsers,
   getUserChats,
@@ -34,6 +35,8 @@ interface PanelSizes {
 }
 
 export default function AdminChatPage() {
+  const router = useRouter();
+
   const [users, setUsers] = useState<User[]>([]);
   const [totalUsers, setTotalUsers] = useState(0);
   const [currentUserPage, setCurrentUserPage] = useState(1);
@@ -102,6 +105,16 @@ export default function AdminChatPage() {
       setCurrentUserPage(page);
     } catch (error) {
       console.error("Error loading users:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      // Check if unauthorized (401)
+      if (
+        errorMessage.includes("Unauthorized") ||
+        errorMessage.includes("401")
+      ) {
+        console.log("[AdminChat] Unauthorized - redirecting to login");
+        router.push("/login");
+        return;
+      }
       alert("Failed to load users");
     } finally {
       setIsUsersLoading(false);
@@ -121,6 +134,16 @@ export default function AdminChatPage() {
       setCurrentChatPage(page);
     } catch (error) {
       console.error("Error loading user chats:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      // Check if unauthorized (401)
+      if (
+        errorMessage.includes("Unauthorized") ||
+        errorMessage.includes("401")
+      ) {
+        console.log("[AdminChat] Unauthorized - redirecting to login");
+        router.push("/login");
+        return;
+      }
       alert("Failed to load user chats");
     } finally {
       setIsChatsLoading(false);
@@ -147,6 +170,15 @@ export default function AdminChatPage() {
         },
       });
 
+      // Check if unauthorized (401)
+      if (response.status === 401) {
+        console.log(
+          "[AdminChat] Unauthorized (401) - redirecting to login"
+        );
+        router.push("/login");
+        return;
+      }
+
       if (!response.ok) {
         throw new Error("Failed to load chat details");
       }
@@ -154,7 +186,8 @@ export default function AdminChatPage() {
       const data = await response.json();
       console.log("[AdminChat] Loaded chat details:", data);
       setSelectedChat(data);
-      setChatMessages(data.messages || []);
+      // Use real_messages for full context with tool calls and sources
+      setChatMessages(data.real_messages || data.messages || []);
     } catch (error) {
       console.error("Error loading chat details:", error);
       alert("Failed to load chat details");
@@ -217,6 +250,15 @@ export default function AdminChatPage() {
         }
       );
 
+      // Check if unauthorized (401)
+      if (analysisResponse.status === 401) {
+        console.log(
+          "[AdminChat] Unauthorized (401) - redirecting to login"
+        );
+        router.push("/login");
+        return;
+      }
+
       if (!analysisResponse.ok) {
         throw new Error("Failed to end session");
       }
@@ -248,11 +290,11 @@ export default function AdminChatPage() {
   return (
     <div className="flex h-full w-full flex-col bg-background">
       {/* Page Header */}
-      <div className="shrink-0 border-b px-6 py-6">
+      <div className="shrink-0 border-b px-6 py-3">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight">User Chats</h1>
-            <p className="mt-2 text-base text-muted-foreground">
+            <h1 className="text-2xl font-bold tracking-tight">User Chats</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
               View and manage user conversations
             </p>
           </div>
@@ -273,7 +315,7 @@ export default function AdminChatPage() {
       >
         {/* Left Panel - User List */}
         <Panel defaultSize={panelSizes.left} minSize={15} maxSize={40}>
-          <div className="flex h-full flex-col border-r">
+          <div className="flex h-full flex-col border-r overflow-x-hidden">
             {/* User Search */}
             <div className="shrink-0 border-b p-4">
               <input
@@ -356,9 +398,9 @@ export default function AdminChatPage() {
             {selectedUserId ? (
               <>
                 {/* Chat Header */}
-                <div className="shrink-0 border-b p-4">
-                  <h2 className="text-lg font-semibold">{selectedUserName}</h2>
-                  <p className="text-sm text-muted-foreground">
+                <div className="shrink-0 border-b p-3">
+                  <h2 className="text-sm font-semibold">{selectedUserName}</h2>
+                  <p className="text-xs text-muted-foreground">
                     {selectedUserEmail}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -454,28 +496,22 @@ export default function AdminChatPage() {
 
         {/* Right Panel - Chat Details */}
         <Panel defaultSize={panelSizes.right} minSize={20} maxSize={60}>
-          <div
-            className={`flex h-full flex-col bg-muted/30 transition-opacity duration-300 ${
-              isEndingSession === selectedChatId
-                ? "opacity-50 pointer-events-none"
-                : ""
-            }`}
-          >
+          <div className="flex h-full flex-col bg-muted/30">
             {selectedChat ? (
               <>
                 {/* Chat Header */}
-                <div className="shrink-0 border-b p-4">
+                <div className="shrink-0 border-b p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <h2 className="text-lg font-semibold truncate">
+                      <h2 className="text-sm font-semibold truncate">
                         {selectedChat.title}
                       </h2>
-                      <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                        <span className="capitalize bg-muted px-2 py-1 rounded">
+                      <div className="flex gap-2 mt-1 text-xs">
+                        <span className="capitalize bg-muted px-2 py-0.5 rounded text-muted-foreground">
                           {selectedChat.status}
                         </span>
                         {selectedChat.analyzed_at && (
-                          <span className="bg-green-500/20 text-green-700 dark:text-green-400 px-2 py-1 rounded">
+                          <span className="bg-green-500/20 text-green-700 dark:text-green-400 px-2 py-0.5 rounded">
                             ✓ Analyzed
                           </span>
                         )}
@@ -597,18 +633,116 @@ export default function AdminChatPage() {
                           <h3 className="font-semibold text-sm sticky top-0 bg-muted/30 py-2">
                             Messages ({chatMessages.length})
                           </h3>
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             {chatMessages.map((msg, idx) => (
                               <div
                                 key={idx}
-                                className="text-xs p-3 rounded bg-background border"
+                                className={`text-xs p-3 rounded border ${
+                                  msg.role === "system"
+                                    ? "bg-slate-900/50 border-slate-700"
+                                    : msg.role === "user"
+                                    ? "bg-blue-950/50 border-blue-700"
+                                    : msg.role === "assistant"
+                                    ? "bg-green-950/50 border-green-700"
+                                    : msg.role === "tool"
+                                    ? "bg-orange-950/50 border-orange-700"
+                                    : "bg-background border-border"
+                                }`}
                               >
-                                <div className="font-medium capitalize text-muted-foreground mb-1">
+                                {/* Role Badge */}
+                                <div
+                                  className={`font-medium capitalize mb-2 px-2 py-1 rounded inline-block ${
+                                    msg.role === "system"
+                                      ? "bg-slate-700 text-slate-100"
+                                      : msg.role === "user"
+                                      ? "bg-blue-700 text-blue-100"
+                                      : msg.role === "assistant"
+                                      ? "bg-green-700 text-green-100"
+                                      : msg.role === "tool"
+                                      ? "bg-orange-700 text-orange-100"
+                                      : "bg-muted text-muted-foreground"
+                                  }`}
+                                >
                                   {msg.role}
                                 </div>
-                                <div className="text-foreground break-words">
-                                  {msg.content}
-                                </div>
+
+                                {/* Timestamp if available */}
+                                {msg.created_at && (
+                                  <div className="text-xs text-muted-foreground mb-2">
+                                    {new Date(msg.created_at).toLocaleString()}
+                                  </div>
+                                )}
+
+                                {/* Main Content */}
+                                {msg.content && (
+                                  <div className="text-foreground break-words mb-2">
+                                    {msg.content}
+                                  </div>
+                                )}
+
+                                {/* Tool Calls if present */}
+                                {msg.tool_calls && msg.tool_calls.length > 0 && (
+                                  <div className="mt-2 pt-2 border-t border-current/20 space-y-1">
+                                    <div className="font-semibold text-yellow-400">
+                                      Tool Calls:
+                                    </div>
+                                    {msg.tool_calls.map((toolCall, tidx) => (
+                                      <div
+                                        key={tidx}
+                                        className="ml-2 p-1 bg-background/50 rounded text-xs"
+                                      >
+                                        <div className="font-medium text-yellow-300">
+                                          {toolCall.name || toolCall.id}
+                                        </div>
+                                        {toolCall.args && (
+                                          <pre className="text-xs overflow-auto mt-1 p-1 bg-background rounded">
+                                            {JSON.stringify(
+                                              toolCall.args,
+                                              null,
+                                              2
+                                            )}
+                                          </pre>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Sources if present */}
+                                {msg.sources && msg.sources.length > 0 && (
+                                  <div className="mt-2 pt-2 border-t border-current/20 space-y-1">
+                                    <div className="font-semibold text-green-400">
+                                      Sources:
+                                    </div>
+                                    {msg.sources.map((source, sidx) => (
+                                      <div
+                                        key={sidx}
+                                        className="ml-2 p-1 bg-background/50 rounded text-xs"
+                                      >
+                                        <div className="text-green-300">
+                                          {source.document_name ||
+                                            source.filename ||
+                                            "Document"}{" "}
+                                          (Page {source.page || source.page_number || 1})
+                                        </div>
+                                        {source.similarity_score && (
+                                          <div className="text-xs text-muted-foreground">
+                                            Similarity: {(
+                                              source.similarity_score * 100
+                                            ).toFixed(2)}%
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Tool Call ID if present */}
+                                {msg.tool_call_id && (
+                                  <div className="mt-1 text-xs text-gray-500">
+                                    Tool ID: {msg.tool_call_id}
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
