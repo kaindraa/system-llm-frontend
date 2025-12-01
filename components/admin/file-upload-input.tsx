@@ -117,13 +117,13 @@ export const FileUploadInput: FC<FileUploadInputProps> = ({
         </div>
       ) : (
         <div className="rounded-lg border bg-card p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-blue-100 p-2">
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="rounded-lg bg-blue-100 p-2 shrink-0">
                 <Upload className="h-5 w-5 text-blue-600" />
               </div>
-              <div>
-                <p className="font-medium text-sm truncate">
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-sm truncate break-words">
                   {selectedFile.name}
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -137,7 +137,7 @@ export const FileUploadInput: FC<FileUploadInputProps> = ({
               size="sm"
               onClick={handleClear}
               disabled={disabled || isLoading}
-              className="text-muted-foreground hover:text-destructive"
+              className="text-muted-foreground hover:text-destructive shrink-0"
             >
               <X className="h-4 w-4" />
             </Button>

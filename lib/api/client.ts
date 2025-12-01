@@ -5,6 +5,7 @@ const apiClient = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  timeout: 120000, // 2 minutes for large files
 });
 
 // Request interceptor to add JWT token
@@ -17,6 +18,12 @@ apiClient.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
+
+    // Don't force Content-Type for blob downloads
+    if (config.responseType === "blob" && config.headers) {
+      delete config.headers["Content-Type"];
+    }
+
     return config;
   },
   (error) => {

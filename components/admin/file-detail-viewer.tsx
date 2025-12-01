@@ -27,12 +27,38 @@ export const FileDetailViewer: FC<FileDetailViewerProps> = ({
       fileService
         .downloadFile(file.id)
         .then((blob) => {
+          console.log(
+            `[FileDetailViewer] Blob received: size=${blob.size}, type=${blob.type}`
+          );
+
+          // Validate blob
+          if (blob.size === 0) {
+            throw new Error("Received empty blob - file may be corrupted");
+          }
+
+          // For non-PDF files, still create object URL
           const url = URL.createObjectURL(blob);
+          console.log(`[FileDetailViewer] Created object URL: ${url}`);
           setFileUrl(url);
         })
-        .catch((err) => {
-          console.error("Error loading PDF:", err);
-          setError("Failed to load PDF file");
+        .catch((err: any) => {
+          const errorMsg =
+            err?.message ||
+            err?.response?.statusText ||
+            "Unknown error occurred";
+          const errorDetails = {
+            message: errorMsg,
+            code: err?.code,
+            status: err?.response?.status,
+            statusText: err?.response?.statusText,
+            fileId: file.id,
+            fileName: file.original_filename,
+          };
+
+          console.error("[FileDetailViewer] Error loading PDF:", errorDetails);
+          setError(
+            `Failed to load PDF: ${errorMsg}. Please try again or contact support.`
+          );
         })
         .finally(() => {
           setIsPdfLoading(false);

@@ -48,7 +48,7 @@ export const FileUploadDialog: FC<FileUploadDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Upload PDF File</DialogTitle>
           <DialogDescription>
@@ -57,7 +57,7 @@ export const FileUploadDialog: FC<FileUploadDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-6">
+        <div className="py-4 overflow-y-auto flex-1">
           <FileUploadInput
             onFileSelect={handleFileSelect}
             isLoading={isLoading}
@@ -65,7 +65,7 @@ export const FileUploadDialog: FC<FileUploadDialogProps> = ({
           />
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="mt-4">
           <Button
             variant="outline"
             onClick={onClose}

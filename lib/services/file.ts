@@ -68,11 +68,52 @@ export const fileService = {
     return response.data;
   },
 
-  async downloadFile(id: string): Promise<Blob> {
-    const response = await apiClient.get(`/files/${id}/download`, {
-      responseType: "blob",
-    });
-    return response.data;
+  async downloadFile(id: string, retries: number = 3): Promise<Blob> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        console.log(
+          `[FileService.downloadFile] Attempt ${attempt}/${retries} for file ${id}`
+        );
+
+        const response = await apiClient.get(`/files/${id}/download`, {
+          responseType: "blob",
+          timeout: 120000, // 2 minutes per request
+        });
+
+        // Validate that we got actual blob data
+        if (!response.data || response.data.size === 0) {
+          throw new Error(
+            `Invalid blob received: size=${response.data?.size || 0}`
+          );
+        }
+
+        console.log(
+          `[FileService.downloadFile] Successfully downloaded ${response.data.size} bytes`
+        );
+        return response.data;
+      } catch (error) {
+        lastError = error as Error;
+        console.error(
+          `[FileService.downloadFile] Attempt ${attempt} failed:`,
+          error
+        );
+
+        if (attempt < retries) {
+          // Wait before retrying (exponential backoff)
+          const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+          console.log(
+            `[FileService.downloadFile] Retrying in ${delayMs}ms...`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+      }
+    }
+
+    throw new Error(
+      `Failed to download file after ${retries} attempts: ${lastError?.message}`
+    );
   },
 
   async deleteFile(id: string): Promise<void> {
