@@ -37,10 +37,10 @@ export default function Home() {
         console.log("[Home] Redirecting to login - not authenticated");
         router.push("/login");
       }
-      // Redirect admin users to admin dashboard
+      // Redirect admin users to admin chat page
       else if (user.role === UserRole.ADMIN) {
-        console.log("[Home] Redirecting to admin dashboard - user is admin");
-        router.push("/admin/dashboard");
+        console.log("[Home] Redirecting to admin chat - user is admin");
+        router.push("/admin/chat");
       }
       // Otherwise show assistant for students
       else {

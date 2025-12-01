@@ -19,8 +19,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  PanelResizeHandle,
+  Panel,
+  PanelGroup,
+} from "react-resizable-panels";
 
 const PAGE_SIZE = 50;
+
+interface PanelSizes {
+  left: number;
+  middle: number;
+  right: number;
+}
 
 export default function AdminChatPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -43,7 +54,42 @@ export default function AdminChatPage() {
   const [isChatDetailsLoading, setIsChatDetailsLoading] = useState(false);
 
   const [showEndDialog, setShowEndDialog] = useState(false);
-  const [isEndingSession, setIsEndingSession] = useState<string | null>(null); // Store chatId of session being ended
+  const [isEndingSession, setIsEndingSession] = useState<string | null>(null);
+
+  // Panel sizes state
+  const [panelSizes, setPanelSizes] = useState<PanelSizes>({
+    left: 25,
+    middle: 35,
+    right: 40,
+  });
+  const [panelSizesLoading, setPanelSizesLoading] = useState(true);
+
+  // Load panel sizes from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("adminChatPanelSizes");
+      if (saved) {
+        const sizes = JSON.parse(saved) as PanelSizes;
+        if (
+          typeof sizes.left === "number" &&
+          typeof sizes.middle === "number" &&
+          typeof sizes.right === "number"
+        ) {
+          setPanelSizes(sizes);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading panel sizes:", error);
+    } finally {
+      setPanelSizesLoading(false);
+    }
+  }, []);
+
+  // Save panel sizes to localStorage
+  const savePanelSizes = (newSizes: PanelSizes) => {
+    setPanelSizes(newSizes);
+    localStorage.setItem("adminChatPanelSizes", JSON.stringify(newSizes));
+  };
 
   // Load users
   const loadUsers = async (page: number = 1, search?: string) => {
@@ -90,7 +136,8 @@ export default function AdminChatPage() {
   const loadChatDetails = async (chatId: string) => {
     setIsChatDetailsLoading(true);
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
       const response = await fetch(`${API_BASE_URL}/chat/sessions/${chatId}`, {
         method: "GET",
@@ -156,16 +203,19 @@ export default function AdminChatPage() {
     setShowEndDialog(false);
 
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-      // Call analysis endpoint to end session and analyze
-      const analysisResponse = await fetch(`${API_BASE_URL}/chat/sessions/${selectedChatId}/analysis`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const analysisResponse = await fetch(
+        `${API_BASE_URL}/chat/sessions/${selectedChatId}/analysis`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       if (!analysisResponse.ok) {
         throw new Error("Failed to end session");
@@ -174,7 +224,6 @@ export default function AdminChatPage() {
       const analysisData = await analysisResponse.json();
       console.log("[AdminChat] Session analysis completed:", analysisData);
 
-      // Close the chat details immediately after successful closure
       setSelectedChatId(null);
       setSelectedChat(null);
       setChatMessages([]);
@@ -188,10 +237,18 @@ export default function AdminChatPage() {
   const totalUserPages = Math.ceil(totalUsers / PAGE_SIZE);
   const totalChatPages = Math.ceil(totalChats / PAGE_SIZE);
 
+  if (panelSizesLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-8 px-6 py-6">
+    <div className="flex h-full w-full flex-col bg-background">
       {/* Page Header */}
-      <div className="flex flex-col gap-2">
+      <div className="shrink-0 border-b px-6 py-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold tracking-tight">User Chats</h1>
@@ -202,304 +259,375 @@ export default function AdminChatPage() {
         </div>
       </div>
 
-      {/* Main Content - Three Panel Layout */}
-      <div className="grid grid-cols-3 gap-0 rounded-lg border bg-card overflow-hidden h-[600px]">
+      {/* Main Content - Three Panel Resizable Layout */}
+      <PanelGroup
+        direction="horizontal"
+        onLayout={(newSizes) => {
+          savePanelSizes({
+            left: newSizes[0],
+            middle: newSizes[1],
+            right: newSizes[2],
+          });
+        }}
+        className="flex-1 overflow-hidden"
+      >
         {/* Left Panel - User List */}
-        <div className="col-span-1 border-r flex flex-col">
-          {/* User Search */}
-          <div className="p-4 border-b">
-            <input
-              type="text"
-              placeholder="Search users..."
-              value={userSearchTerm}
-              onChange={(e) => handleUserSearch(e.target.value)}
-              className="w-full rounded-md border border-input bg-background px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            />
-          </div>
+        <Panel defaultSize={panelSizes.left} minSize={15} maxSize={40}>
+          <div className="flex h-full flex-col border-r">
+            {/* User Search */}
+            <div className="shrink-0 border-b p-4">
+              <input
+                type="text"
+                placeholder="Search users..."
+                value={userSearchTerm}
+                onChange={(e) => handleUserSearch(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
+            </div>
 
-          {/* User List */}
-          <div className="flex-1 overflow-y-auto">
-            {isUsersLoading ? (
-              <div className="p-4 space-y-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
-              </div>
-            ) : users.length === 0 ? (
-              <div className="p-4 text-center text-sm text-muted-foreground">
-                No users found
-              </div>
-            ) : (
-              <div className="divide-y">
-                {users.map((user) => (
-                  <button
-                    key={user.id}
-                    onClick={() => handleSelectUser(user.id)}
-                    className={`w-full text-left p-4 hover:bg-muted transition-colors ${
-                      selectedUserId === user.id ? "bg-muted" : ""
-                    }`}
-                  >
-                    <div className="font-medium text-sm">{user.full_name}</div>
-                    <div className="text-xs text-muted-foreground">{user.email}</div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {user.chat_count} chat(s)
-                    </div>
-                  </button>
-                ))}
+            {/* User List */}
+            <div className="flex-1 overflow-y-auto">
+              {isUsersLoading ? (
+                <div className="space-y-2 p-4">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : users.length === 0 ? (
+                <div className="flex items-center justify-center p-4 text-center text-sm text-muted-foreground">
+                  No users found
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {users.map((user) => (
+                    <button
+                      key={user.id}
+                      onClick={() => handleSelectUser(user.id)}
+                      className={`w-full text-left p-4 hover:bg-muted transition-colors ${
+                        selectedUserId === user.id ? "bg-muted" : ""
+                      }`}
+                    >
+                      <div className="font-medium text-sm">{user.full_name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {user.email}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {user.chat_count} chat(s)
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* User Pagination */}
+            {totalUserPages > 1 && (
+              <div className="shrink-0 border-t p-4 flex gap-2 justify-between">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleUserPageChange(currentUserPage - 1)}
+                  disabled={currentUserPage === 1}
+                >
+                  Prev
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {currentUserPage} / {totalUserPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleUserPageChange(currentUserPage + 1)}
+                  disabled={currentUserPage === totalUserPages}
+                >
+                  Next
+                </Button>
               </div>
             )}
           </div>
+        </Panel>
 
-          {/* User Pagination */}
-          {totalUserPages > 1 && (
-            <div className="p-4 border-t flex gap-2 justify-between">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleUserPageChange(currentUserPage - 1)}
-                disabled={currentUserPage === 1}
-              >
-                Prev
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                {currentUserPage} / {totalUserPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleUserPageChange(currentUserPage + 1)}
-                disabled={currentUserPage === totalUserPages}
-              >
-                Next
-              </Button>
-            </div>
-          )}
-        </div>
+        {/* Resize Handle between left and middle */}
+        <PanelResizeHandle className="bg-border hover:bg-primary/20 transition-colors w-1" />
 
         {/* Middle Panel - Chat List */}
-        <div className="col-span-1 border-r flex flex-col">
-          {selectedUserId ? (
-            <>
-              {/* Chat Header */}
-              <div className="p-4 border-b">
-                <h2 className="text-lg font-semibold">{selectedUserName}</h2>
-                <p className="text-sm text-muted-foreground">{selectedUserEmail}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Total chats: {totalChats}
-                </p>
-              </div>
-
-              {/* Chat List */}
-              <div className="flex-1 overflow-y-auto">
-                {isChatsLoading ? (
-                  <div className="p-6 space-y-4">
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <div key={i} className="space-y-2">
-                        <Skeleton className="h-6 w-full" />
-                        <Skeleton className="h-4 w-2/3" />
-                      </div>
-                    ))}
-                  </div>
-                ) : chats.length === 0 ? (
-                  <div className="p-6 text-center text-sm text-muted-foreground">
-                    No chats found
-                  </div>
-                ) : (
-                  <div className="divide-y">
-                    {chats.map((chat) => (
-                      <button
-                        key={chat.id}
-                        onClick={() => handleSelectChat(chat)}
-                        className={`w-full text-left p-4 hover:bg-muted/50 transition-colors border-l-4 ${
-                          selectedChatId === chat.id ? "bg-muted border-primary" : "border-transparent"
-                        }`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-sm truncate">{chat.title}</h3>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {chat.total_messages} message(s)
-                          </p>
-                          <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
-                            <span className="capitalize">{chat.status}</span>
-                            <span>•</span>
-                            <span>{new Date(chat.started_at).toLocaleDateString()}</span>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Chat Pagination */}
-              {totalChatPages > 1 && (
-                <div className="p-4 border-t flex gap-2 justify-between">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleChatPageChange(currentChatPage - 1)}
-                    disabled={currentChatPage === 1}
-                  >
-                    Prev
-                  </Button>
-                  <span className="text-xs text-muted-foreground">
-                    {currentChatPage} / {totalChatPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleChatPageChange(currentChatPage + 1)}
-                    disabled={currentChatPage === totalChatPages}
-                  >
-                    Next
-                  </Button>
+        <Panel defaultSize={panelSizes.middle} minSize={20} maxSize={50}>
+          <div className="flex h-full flex-col border-r">
+            {selectedUserId ? (
+              <>
+                {/* Chat Header */}
+                <div className="shrink-0 border-b p-4">
+                  <h2 className="text-lg font-semibold">{selectedUserName}</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedUserEmail}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Total chats: {totalChats}
+                  </p>
                 </div>
-              )}
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center text-muted-foreground">
-                <p className="text-sm">Select a user to view their chats</p>
-              </div>
-            </div>
-          )}
-        </div>
 
-        {/* Right Panel - Chat Details */}
-        <div className={`col-span-1 flex flex-col bg-muted/30 transition-opacity duration-300 ${isEndingSession === selectedChatId ? "opacity-50 pointer-events-none" : ""}`}>
-          {selectedChat ? (
-            <>
-              {/* Chat Header */}
-              <div className="p-4 border-b">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <h2 className="text-lg font-semibold truncate">{selectedChat.title}</h2>
-                    <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                      <span className="capitalize bg-muted px-2 py-1 rounded">
-                        {selectedChat.status}
-                      </span>
-                      {selectedChat.analyzed_at && (
-                        <span className="bg-green-500/20 text-green-700 dark:text-green-400 px-2 py-1 rounded">
-                          ✓ Analyzed
-                        </span>
-                      )}
+                {/* Chat List */}
+                <div className="flex-1 overflow-y-auto">
+                  {isChatsLoading ? (
+                    <div className="space-y-4 p-6">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="space-y-2">
+                          <Skeleton className="h-6 w-full" />
+                          <Skeleton className="h-4 w-2/3" />
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                  {selectedChat.status === "active" && (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => setShowEndDialog(true)}
-                      disabled={isEndingSession === selectedChatId}
-                      className="whitespace-nowrap"
-                    >
-                      {isEndingSession === selectedChatId ? "Ending..." : "End Chat"}
-                    </Button>
+                  ) : chats.length === 0 ? (
+                    <div className="flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                      No chats found
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {chats.map((chat) => (
+                        <button
+                          key={chat.id}
+                          onClick={() => handleSelectChat(chat)}
+                          className={`w-full text-left p-4 hover:bg-muted/50 transition-colors border-l-4 ${
+                            selectedChatId === chat.id
+                              ? "bg-muted border-primary"
+                              : "border-transparent"
+                          }`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-sm truncate">
+                              {chat.title}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {chat.total_messages} message(s)
+                            </p>
+                            <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
+                              <span className="capitalize">{chat.status}</span>
+                              <span>•</span>
+                              <span>
+                                {new Date(chat.started_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
-              </div>
 
-              {/* Chat Details Content */}
-              <div className="flex-1 overflow-y-auto">
-                {isChatDetailsLoading ? (
-                  <div className="p-6 space-y-4">
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <Skeleton key={i} className="h-20 w-full" />
-                    ))}
+                {/* Chat Pagination */}
+                {totalChatPages > 1 && (
+                  <div className="shrink-0 border-t p-4 flex gap-2 justify-between">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleChatPageChange(currentChatPage - 1)}
+                      disabled={currentChatPage === 1}
+                    >
+                      Prev
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      {currentChatPage} / {totalChatPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleChatPageChange(currentChatPage + 1)}
+                      disabled={currentChatPage === totalChatPages}
+                    >
+                      Next
+                    </Button>
                   </div>
-                ) : (
-                  <div className="p-4 space-y-6">
-                    {/* Analysis Summary Section */}
-                    {selectedChat.summary && (
-                      <div className="space-y-2">
-                        <h3 className="font-semibold text-sm">Analysis Summary</h3>
-                        <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
-                          {selectedChat.summary}
-                        </p>
-                      </div>
-                    )}
+                )}
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center text-muted-foreground">
+                  <p className="text-sm">Select a user to view their chats</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </Panel>
 
-                    {/* Comprehension Level */}
-                    {selectedChat.comprehension_level && (
-                      <div className="space-y-2">
-                        <h3 className="font-semibold text-sm">Comprehension Level</h3>
-                        <div className={`text-sm font-medium px-3 py-2 rounded text-center ${
-                          selectedChat.comprehension_level === "HIGH"
-                            ? "bg-green-500/20 text-green-700 dark:text-green-400"
-                            : selectedChat.comprehension_level === "MEDIUM"
-                            ? "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400"
-                            : "bg-red-500/20 text-red-700 dark:text-red-400"
-                        }`}>
-                          {selectedChat.comprehension_level}
-                        </div>
-                      </div>
-                    )}
+        {/* Resize Handle between middle and right */}
+        <PanelResizeHandle className="bg-border hover:bg-primary/20 transition-colors w-1" />
 
-                    {/* Chat Info */}
-                    <div className="space-y-2 text-xs pt-4 border-t">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Model:</span>
-                        <span className="font-medium">{selectedChat.model_name || selectedChat.model_id}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Messages:</span>
-                        <span className="font-medium">{selectedChat.total_messages}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Started:</span>
-                        <span className="font-medium">
-                          {new Date(selectedChat.started_at).toLocaleDateString()}
+        {/* Right Panel - Chat Details */}
+        <Panel defaultSize={panelSizes.right} minSize={20} maxSize={60}>
+          <div
+            className={`flex h-full flex-col bg-muted/30 transition-opacity duration-300 ${
+              isEndingSession === selectedChatId
+                ? "opacity-50 pointer-events-none"
+                : ""
+            }`}
+          >
+            {selectedChat ? (
+              <>
+                {/* Chat Header */}
+                <div className="shrink-0 border-b p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h2 className="text-lg font-semibold truncate">
+                        {selectedChat.title}
+                      </h2>
+                      <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                        <span className="capitalize bg-muted px-2 py-1 rounded">
+                          {selectedChat.status}
                         </span>
-                      </div>
-                      {selectedChat.ended_at && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Ended:</span>
-                          <span className="font-medium">
-                            {new Date(selectedChat.ended_at).toLocaleDateString()}
+                        {selectedChat.analyzed_at && (
+                          <span className="bg-green-500/20 text-green-700 dark:text-green-400 px-2 py-1 rounded">
+                            ✓ Analyzed
                           </span>
+                        )}
+                      </div>
+                    </div>
+                    {selectedChat.status === "active" && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setShowEndDialog(true)}
+                        disabled={isEndingSession === selectedChatId}
+                        className="whitespace-nowrap shrink-0"
+                      >
+                        {isEndingSession === selectedChatId
+                          ? "Ending..."
+                          : "End Chat"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Chat Details Content */}
+                <div className="flex-1 overflow-y-auto">
+                  {isChatDetailsLoading ? (
+                    <div className="space-y-4 p-6">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <Skeleton key={i} className="h-20 w-full" />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 space-y-6">
+                      {/* Analysis Summary Section */}
+                      {selectedChat.summary && (
+                        <div className="space-y-2">
+                          <h3 className="font-semibold text-sm">
+                            Analysis Summary
+                          </h3>
+                          <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
+                            {selectedChat.summary}
+                          </p>
                         </div>
                       )}
-                      {selectedChat.analyzed_at && (
+
+                      {/* Comprehension Level */}
+                      {selectedChat.comprehension_level && (
+                        <div className="space-y-2">
+                          <h3 className="font-semibold text-sm">
+                            Comprehension Level
+                          </h3>
+                          <div
+                            className={`text-sm font-medium px-3 py-2 rounded text-center ${
+                              selectedChat.comprehension_level === "HIGH"
+                                ? "bg-green-500/20 text-green-700 dark:text-green-400"
+                                : selectedChat.comprehension_level === "MEDIUM"
+                                ? "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400"
+                                : "bg-red-500/20 text-red-700 dark:text-red-400"
+                            }`}
+                          >
+                            {selectedChat.comprehension_level}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Chat Info */}
+                      <div className="space-y-2 text-xs pt-4 border-t">
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Analyzed:</span>
+                          <span className="text-muted-foreground">Model:</span>
                           <span className="font-medium">
-                            {new Date(selectedChat.analyzed_at).toLocaleDateString()}
+                            {selectedChat.model_name || selectedChat.model_id}
                           </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            Messages:
+                          </span>
+                          <span className="font-medium">
+                            {selectedChat.total_messages}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            Started:
+                          </span>
+                          <span className="font-medium">
+                            {new Date(
+                              selectedChat.started_at
+                            ).toLocaleDateString()}
+                          </span>
+                        </div>
+                        {selectedChat.ended_at && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Ended:
+                            </span>
+                            <span className="font-medium">
+                              {new Date(
+                                selectedChat.ended_at
+                              ).toLocaleDateString()}
+                            </span>
+                          </div>
+                        )}
+                        {selectedChat.analyzed_at && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Analyzed:
+                            </span>
+                            <span className="font-medium">
+                              {new Date(
+                                selectedChat.analyzed_at
+                              ).toLocaleDateString()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Messages - Full Height */}
+                      {chatMessages.length > 0 && (
+                        <div className="space-y-2 pt-4 border-t">
+                          <h3 className="font-semibold text-sm sticky top-0 bg-muted/30 py-2">
+                            Messages ({chatMessages.length})
+                          </h3>
+                          <div className="space-y-2">
+                            {chatMessages.map((msg, idx) => (
+                              <div
+                                key={idx}
+                                className="text-xs p-3 rounded bg-background border"
+                              >
+                                <div className="font-medium capitalize text-muted-foreground mb-1">
+                                  {msg.role}
+                                </div>
+                                <div className="text-foreground break-words">
+                                  {msg.content}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
-
-                    {/* Messages */}
-                    {chatMessages.length > 0 && (
-                      <div className="space-y-2 pt-4 border-t">
-                        <h3 className="font-semibold text-sm">Messages</h3>
-                        <div className="space-y-2 max-h-48 overflow-y-auto">
-                          {chatMessages.slice(-5).map((msg, idx) => (
-                            <div key={idx} className="text-xs p-2 rounded bg-background">
-                              <div className="font-medium capitalize text-muted-foreground mb-1">
-                                {msg.role}
-                              </div>
-                              <div className="text-foreground line-clamp-2">
-                                {msg.content}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center text-muted-foreground">
+                  <p className="text-sm">Select a chat to view details</p>
+                </div>
               </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center text-muted-foreground">
-                <p className="text-sm">Select a chat to view details</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+            )}
+          </div>
+        </Panel>
+      </PanelGroup>
 
       {/* End Chat Dialog */}
       <Dialog open={showEndDialog} onOpenChange={setShowEndDialog}>
@@ -507,7 +635,8 @@ export default function AdminChatPage() {
           <DialogHeader>
             <DialogTitle>End Chat?</DialogTitle>
             <DialogDescription>
-              Once you end this chat, it cannot be resumed. The session will be analyzed and closed.
+              Once you end this chat, it cannot be resumed. The session will be
+              analyzed and closed.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
