@@ -292,12 +292,13 @@ const AssistantContent = ({
 
               {/* Model Dropdown Menu */}
               {showModelDropdown && !isModelDisabled && config && config.models && config.models.length > 0 && (
-                <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-md shadow-md z-50 min-w-max">
+                <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-md shadow-md z-50 w-56">
                   {config.models.map((model) => (
                     <button
                       key={model.id}
                       onClick={() => handleModelSelect(model.display_name)}
-                      className={`w-full text-left px-3 py-2 hover:bg-muted transition-colors ${
+                      title={model.display_name}
+                      className={`w-full text-left px-3 py-2 hover:bg-muted transition-colors truncate ${
                         modelName === model.display_name ? "bg-muted" : ""
                       }`}
                     >
