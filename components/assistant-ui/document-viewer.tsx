@@ -2,7 +2,8 @@
 
 import type { FC } from "react";
 import { useState, useEffect } from "react";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { documentService, type DocumentResponse } from "@/lib/services/document";
 
 interface DocumentViewerProps {
@@ -21,6 +22,54 @@ export const DocumentViewer: FC<DocumentViewerProps> = ({
   const [fileUrl, setFileUrl] = useState<string>("");
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [error, setError] = useState<string>("");
+
+  const handleRetry = () => {
+    if (document) {
+      setError("");
+      setFileUrl("");
+      setIsPdfLoading(true);
+
+      documentService
+        .downloadDocument(document.id)
+        .then((blob) => {
+          const url = URL.createObjectURL(blob);
+          setFileUrl(url);
+          console.log("[DocumentViewer] Document loaded successfully via Blob URL");
+        })
+        .catch((err) => {
+          console.error("[DocumentViewer] Error loading document on retry:", err);
+          let errorMessage = "Failed to load document";
+
+          if (err?.response?.status) {
+            const status = err.response.status;
+            if (status === 404) {
+              errorMessage = "Document not found (404)";
+            } else if (status === 401 || status === 403) {
+              errorMessage = "Access denied - Not authorized to view this document";
+            } else if (status === 500) {
+              errorMessage = "Server error - Unable to download file (500)";
+            } else if (status >= 500) {
+              errorMessage = `Server error (${status}) - Please try again later`;
+            } else {
+              errorMessage = `Error loading document (${status})`;
+            }
+          } else if (err?.code === 'ERR_NETWORK' || err?.message?.includes('Network')) {
+            errorMessage = "Network error - Check your connection";
+          } else if (err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
+            errorMessage = "Request timeout - File is taking too long to load";
+          } else if (err?.message?.includes('blob') || err?.message?.includes('Blob')) {
+            errorMessage = "Failed to process document file";
+          } else if (err?.message) {
+            errorMessage = `Failed to load document: ${err.message}`;
+          }
+
+          setError(errorMessage);
+        })
+        .finally(() => {
+          setIsPdfLoading(false);
+        });
+    }
+  };
 
   useEffect(() => {
     if (document) {
@@ -44,7 +93,48 @@ export const DocumentViewer: FC<DocumentViewerProps> = ({
         })
         .catch((err) => {
           console.error("[DocumentViewer] Error loading document:", err);
-          setError("Failed to load document");
+
+          // Extract detailed error information
+          let errorMessage = "Failed to load document";
+
+          // Handle Axios/HTTP errors
+          if (err?.response?.status) {
+            const status = err.response.status;
+            console.error(`[DocumentViewer] HTTP Error ${status}`);
+
+            if (status === 404) {
+              errorMessage = "Document not found (404)";
+            } else if (status === 401 || status === 403) {
+              errorMessage = "Access denied - Not authorized to view this document";
+            } else if (status === 500) {
+              errorMessage = "Server error - Unable to download file (500)";
+            } else if (status >= 500) {
+              errorMessage = `Server error (${status}) - Please try again later`;
+            } else {
+              errorMessage = `Error loading document (${status})`;
+            }
+          }
+          // Handle network errors
+          else if (err?.code === 'ERR_NETWORK' || err?.message?.includes('Network')) {
+            errorMessage = "Network error - Check your connection";
+            console.error("[DocumentViewer] Network connectivity issue");
+          }
+          // Handle timeout errors
+          else if (err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
+            errorMessage = "Request timeout - File is taking too long to load";
+            console.error("[DocumentViewer] Request timeout");
+          }
+          // Handle blob creation errors
+          else if (err?.message?.includes('blob') || err?.message?.includes('Blob')) {
+            errorMessage = "Failed to process document file";
+            console.error("[DocumentViewer] Blob processing error");
+          }
+          // Generic error with message if available
+          else if (err?.message) {
+            errorMessage = `Failed to load document: ${err.message}`;
+          }
+
+          setError(errorMessage);
         })
         .finally(() => {
           setIsPdfLoading(false);
@@ -87,10 +177,23 @@ export const DocumentViewer: FC<DocumentViewerProps> = ({
     <div className="flex flex-col h-full overflow-hidden">
       {/* Error State */}
       {error ? (
-        <div className="flex h-full flex-col items-center justify-center bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400">
-          <AlertCircle className="mb-2 h-8 w-8" />
-          <p className="font-medium">{error}</p>
-          <p className="text-sm">Failed to load document</p>
+        <div className="flex h-full flex-col items-center justify-center gap-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-4">
+          <AlertCircle className="h-10 w-10" />
+          <div className="text-center">
+            <p className="font-medium text-base">{error}</p>
+            <p className="text-sm mt-1 text-red-500/80 dark:text-red-400/80">
+              Unable to load the PDF document. Please check your connection or contact support if the problem persists.
+            </p>
+          </div>
+          <Button
+            onClick={handleRetry}
+            disabled={isPdfLoading}
+            variant="outline"
+            className="mt-2"
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            {isPdfLoading ? "Loading..." : "Retry"}
+          </Button>
         </div>
       ) : isPdfLoading ? (
         <div className="flex h-full items-center justify-center bg-muted text-muted-foreground">

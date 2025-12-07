@@ -10,10 +10,13 @@ import { useState } from "react";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 
 interface MarkdownRendererProps {
-  children: string;
+  children: string | React.ReactNode;
 }
 
 export const MarkdownRenderer = ({ children }: MarkdownRendererProps) => {
+  // Convert children to string if it's not already
+  const childrenString = typeof children === 'string' ? children : String(children);
+
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm, remarkMath]}
@@ -155,7 +158,7 @@ export const MarkdownRenderer = ({ children }: MarkdownRendererProps) => {
         ),
       }}
     >
-      {children}
+      {childrenString}
     </ReactMarkdown>
   );
 };

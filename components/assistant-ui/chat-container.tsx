@@ -357,12 +357,15 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
                   // Handle refined prompt result event
                   if (data.type === "refine_prompt_result") {
                     console.log("[ChatContainer] ✅ Refine prompt result event received:", data);
+                    console.log("[ChatContainer] data.content:", data.content);
+                    console.log("[ChatContainer] data.content?.refined type:", typeof data.content?.refined, "value:", data.content?.refined);
                     const result: RefinedPromptResult = {
                       original: data.content?.original || "",
                       refined: data.content?.refined || "",
                       success: data.content?.success ?? true,
                       error: data.content?.error,
                     };
+                    console.log("[ChatContainer] Created result object:", result);
 
                     // Update message with refined prompt result immediately
                     flushSync(() => {
@@ -543,14 +546,33 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
                     }
 
                     // Update final message with sources and tool_calls
+                    console.log("[ChatContainer] data.content:", data.content, "type:", typeof data.content);
+                    console.log("[ChatContainer] assistantContent:", assistantContent, "type:", typeof assistantContent);
+
                     const finalContent = data.content || assistantContent;
+                    console.log("[ChatContainer] finalContent (after ||):", finalContent, "type:", typeof finalContent);
+
+                    // Ensure finalContent is a string - if it's an object, convert to JSON string
+                    let contentStr = '';
+                    if (typeof finalContent === 'string') {
+                      contentStr = finalContent;
+                    } else if (typeof finalContent === 'object' && finalContent !== null) {
+                      // If it's an object, log it and use assistantContent instead
+                      console.warn("[ChatContainer] finalContent is an object, using assistantContent instead:", finalContent);
+                      contentStr = assistantContent;
+                    } else {
+                      contentStr = assistantContent;
+                    }
+
+                    console.log("[ChatContainer] Final contentStr to save:", contentStr);
+
                     setMessages((prev) => {
                       const updated = [...prev];
                       if (updated.length > 0) {
                         updated[updated.length - 1] = {
                           ...updated[updated.length - 1],
                           sources: currentSources,
-                          content: finalContent,
+                          content: contentStr,
                           tool_calls: toolCallsData.length > 0 ? toolCallsData : undefined,
                         };
                       }
@@ -880,8 +902,11 @@ const MessageBubbleComponent = ({
                     const tools: string[] = [];
                     if (message.refinedPrompt) tools.push("Refine Prompt");
                     if (message.sources && message.sources.length > 0) tools.push("Semantic Search");
-                    if (message.tool_calls && message.tool_calls.length > 0) {
-                      const toolNames = message.tool_calls.map(tc => tc.name).filter((name, idx, arr) => arr.indexOf(name) === idx);
+                    if (message.tool_calls && Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
+                      const toolNames = message.tool_calls
+                        .filter(tc => tc && tc.name && typeof tc.name === 'string')
+                        .map(tc => tc.name)
+                        .filter((name, idx, arr) => arr.indexOf(name) === idx);
                       tools.push(...toolNames);
                     }
                     return tools.length > 0 ? `, used ${tools.join(" and ")}` : "";
