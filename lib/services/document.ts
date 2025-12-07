@@ -145,7 +145,25 @@ export const documentService = {
         }
       );
 
-      return response.data;
+      const blob = response.data;
+      console.log("[DocumentService.downloadDocument] Blob received:");
+      console.log("  - Size:", blob.size, "bytes");
+      console.log("  - Type:", blob.type);
+      console.log("  - Constructor:", blob.constructor.name);
+
+      // Validate blob is not empty
+      if (blob.size === 0) {
+        throw new Error("Downloaded file is empty (0 bytes)");
+      }
+
+      // Validate PDF signature (starts with %PDF)
+      const header = await blob.slice(0, 4).text();
+      if (header !== "%PDF") {
+        console.warn("[DocumentService.downloadDocument] File does not start with PDF signature, file might be corrupted or not a PDF");
+        console.log("[DocumentService.downloadDocument] File header (first 4 bytes):", header);
+      }
+
+      return blob;
     } catch (error) {
       console.error("[DocumentService] Error downloading document:", error);
       throw error;

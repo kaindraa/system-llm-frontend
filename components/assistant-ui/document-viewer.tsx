@@ -89,10 +89,19 @@ export const DocumentViewer: FC<DocumentViewerProps> = ({
         .then((blob) => {
           const url = URL.createObjectURL(blob);
           setFileUrl(url);
-          console.log("[DocumentViewer] Document loaded successfully via Blob URL");
+          console.log("[DocumentViewer] Document loaded successfully via Blob URL", {
+            blobSize: blob.size,
+            blobType: blob.type,
+            url: url,
+          });
         })
         .catch((err) => {
           console.error("[DocumentViewer] Error loading document:", err);
+          console.error("[DocumentViewer] Error details:", {
+            message: err?.message,
+            code: err?.code,
+            status: err?.response?.status,
+          });
 
           // Extract detailed error information
           let errorMessage = "Failed to load document";
