@@ -5,34 +5,68 @@ Panduan ini mencakup instalasi lengkap Backend dan Frontend dengan database Post
 ## Daftar Isi
 1. [Requirements](#requirements)
 2. [Instalasi](#instalasi)
+   - Step 0: Install Prerequisites
+   - Step 1: Clone Repository
+   - Step 2: Setup Backend Environment
+   - Step 3: Mulai Docker Services
+   - Step 4: Setup Database
+   - Step 5: Setup Frontend
+   - Step 6: Jalankan Frontend
 3. [Memulai](#memulai)
 
 ---
 
 ## Requirements
 
-Sebelum memulai, pastikan sudah terinstal:
+**PENTING: Install tools berikut DULU sebelum mulai setup!**
 
-- **Git** → [Download](https://git-scm.com/)
-- **Docker & Docker Compose** → [Download](https://www.docker.com/products/docker-desktop)
-- **Node.js** (untuk frontend) → [Download](https://nodejs.org/)
-- **Python 3.x** (untuk backend) → [Download](https://www.python.org/)
+### Step 0: Install Prerequisites
+
+Sebelum memulai, pastikan sudah terinstall:
+
+1. **VSCode** (Text Editor) → [Download](https://code.visualstudio.com/)
+   - Gunakan untuk edit file `.env.local` dan kode lainnya
+
+2. **Docker Desktop** → [Download](https://www.docker.com/products/docker-desktop)
+   - **PENTING: Buka aplikasi Docker Desktop sebelum menjalankan docker-compose!**
+   - Docker harus running di background saat setup
+   - Verifikasi dengan: `docker --version`
+
+3. **Git** → [Download](https://git-scm.com/)
+   - Untuk clone repository
+   - Verifikasi dengan: `git --version`
+
+4. **Node.js** (untuk frontend) → [Download](https://nodejs.org/)
+   - Verifikasi dengan: `node --version`
+   - **PENTING: Setelah install Node.js, install pnpm dengan:**
+     ```bash
+     npm install -g pnpm
+     ```
+   - Verifikasi dengan: `pnpm --version`
+
+5. **Python 3.x** (untuk backend) → [Download](https://www.python.org/)
+   - Verifikasi dengan: `python --version`
 
 **API Keys yang diperlukan (minimal):**
 - OpenAI API Key → [Dapatkan](https://platform.openai.com/api-keys) (untuk embedding dan chat)
 
 ### Verifikasi Prerequisites
 
-Setelah install semua requirements, buka terminal/PowerShell dan check versi:
+Setelah install semua requirements, buka terminal/PowerShell **BARU** dan check versi:
 
 ```bash
 git --version
 docker --version
 node --version
+npm --version
+pnpm --version
 python --version
 ```
 
-Semua harus menampilkan versi, bukan "command not found".
+**Semua harus menampilkan versi, bukan "command not found".**
+
+**Jika `pnpm --version` error:**
+Jalankan: `npm install -g pnpm` (pastikan Node.js sudah ter-install dulu)
 
 ---
 
@@ -136,7 +170,9 @@ LOG_LEVEL=INFO
 
 ---
 
-**BAGIAN 2: LLM Provider Configuration (PILIH MINIMAL SATU)**
+**BAGIAN 2: LLM Provider Configuration (PILIH MINIMAL SATU)** 
+
+di `.env.local`
 
 Hanya isi API key dari provider yang Anda ingin gunakan. **Jika tidak ada key untuk provider, cukup hapus baris tersebut atau biarkan kosong.**
 
@@ -185,7 +221,12 @@ Untuk LOCAL development, **hanya perlu SATU API Key** saja. Pilih salah satu:
 
 ### Step 3: Mulai Docker Services (Backend)
 
-**PENTING: Pastikan file `.env.local` sudah dibuat dan dikonfigurasi (Step 2a & 2b) sebelum jalankan command ini!**
+**⚠️ PENTING: Sebelum jalankan command ini:**
+1. **Pastikan Docker Desktop sudah dibuka** (aplikasi Docker Desktop harus running)
+2. **Pastikan file `.env.local` sudah dibuat dan dikonfigurasi** (Step 2a & 2b)
+3. **Verify file `.env.local` ada** di folder `system-llm-backend`
+4. **Verify file `init-pgvector.sql` ada** di root folder `system-llm-backend` (diperlukan untuk PostgreSQL setup)
+
 
 Pastikan Anda masih di folder `system-llm-backend`, kemudian jalankan:
 
@@ -224,38 +265,38 @@ docker-compose -f docker-compose.local.yml logs
 
 ### Step 4: Setup Database
 
-Database memerlukan 2 langkah setup:
+Import data awal ke database (struktur tabel dan admin user):
 
-#### 4a. Jalankan Database Migrations
-
-Database migrations membuat struktur tabel (schema) yang diperlukan:
-
-```bash
-docker-compose -f docker-compose.local.yml exec api python -m alembic upgrade head
+**Windows (PowerShell) - RECOMMENDED METHOD:**
+```powershell
+# Method 1: Copy file ke container dulu (paling reliable)
+docker cp scripts/init.sql system-llm-postgres-local:/init.sql
+docker-compose -f docker-compose.local.yml exec postgres psql -U llm_user -d system_llm -f /init.sql
 ```
 
-**Expected output:** Melihat log migration berjalan, tidak ada error.
+**Windows (PowerShell) - Alternative Method:**
+```powershell
+# Method 2: Gunakan Get-Content (jika Method 1 tidak work)
+Get-Content scripts/init.sql | docker-compose -f docker-compose.local.yml exec -T postgres psql -U llm_user -d system_llm
+```
 
-#### 4b. Import Admin User & AI Models
-
-Import data awal ke database:
-(PowerShell)
+**Mac/Linux:**
 ```bash
-type scripts/init.sql | docker-compose -f docker-compose.local.yml exec -T postgres psql -U llm_user -d system_llm
+cat scripts/init.sql | docker-compose -f docker-compose.local.yml exec -T postgres psql -U llm_user -d system_llm
 ```
 
 **Apa yang diimport:**
+- Struktur database lengkap (semua tabel)
 - Admin user: `admin@example.com` / Password: `admin123`
 - AI models: GPT-4, Claude, Gemini, dll
 - Chat config dan settings
-- Struktur database lengkap
 
-**Verifikasi selesai:**
+**Verifikasi berhasil:**
 ```bash
-docker-compose -f docker-compose.local.yml exec postgres psql -U llm_user -d system_llm -c "SELECT COUNT(*) as total_models FROM model;"
+docker-compose -f docker-compose.local.yml exec postgres psql -U llm_user -d system_llm -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public';"
 ```
 
-Harus menampilkan angka (jumlah AI models, minimal 3).
+Harus menampilkan angka > 5 (minimal 5 tabel).
 
 ### Step 5: Setup Frontend
 
@@ -558,6 +599,34 @@ docker-compose -f docker-compose.local.yml up -d
    Copy-Item .env.example -Destination .env
    ```
 3. Edit dengan text editor yang benar (gunakan UTF-8 encoding)
+
+### Error: "type \"vector\" does not exist" saat migration
+
+**Penyebab:** Custom PostgreSQL image dengan pgvector belum selesai build, atau build error
+
+**Solusi:**
+
+1. **Stop semua container:**
+   ```bash
+   docker-compose -f docker-compose.local.yml down -v
+   ```
+
+2. **Rebuild dan start lagi:**
+   ```bash
+   docker-compose --env-file .env.local -f docker-compose.local.yml up -d
+   ```
+
+   Tunggu 3-5 menit sampai PostgreSQL image selesai build (pertama kali akan lama)
+
+3. **Lihat build log untuk debug:**
+   ```bash
+   docker-compose -f docker-compose.local.yml logs postgres
+   ```
+
+4. **Setelah build selesai, run migration:**
+   ```bash
+   docker-compose -f docker-compose.local.yml exec api python -m alembic upgrade head
+   ```
 
 ### Error: "pnpm: command not found"
 
