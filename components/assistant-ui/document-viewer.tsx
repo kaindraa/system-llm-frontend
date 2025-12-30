@@ -186,27 +186,40 @@ export const DocumentViewer: FC<DocumentViewerProps> = ({
     <div className="flex flex-col h-full overflow-hidden">
       {/* Error State */}
       {error ? (
-        <div className="flex h-full flex-col items-center justify-center gap-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-4">
+        <div className="flex h-full flex-col items-center justify-center gap-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-4 py-8">
           <AlertCircle className="h-10 w-10" />
-          <div className="text-center">
+          <div className="text-center max-w-sm">
             <p className="font-medium text-base">{error}</p>
-            <p className="text-sm mt-1 text-red-500/80 dark:text-red-400/80">
-              Unable to load the PDF document. Please check your connection or contact support if the problem persists.
+            <p className="text-sm mt-2 text-red-500/80 dark:text-red-400/80">
+              The document failed to load. This typically occurs due to network issues or server timeout.
+              The system will automatically retry up to 3 times.
             </p>
+            <div className="mt-4 text-xs text-red-500/70 dark:text-red-400/70 bg-red-100 dark:bg-red-900/30 p-3 rounded">
+              <p className="font-semibold mb-1">Troubleshooting tips:</p>
+              <ul className="text-left space-y-1">
+                <li>• Check your internet connection</li>
+                <li>• Clear browser cache and try again</li>
+                <li>• Try a different browser if available</li>
+                <li>• Wait a few moments and retry</li>
+              </ul>
+            </div>
           </div>
           <Button
             onClick={handleRetry}
             disabled={isPdfLoading}
             variant="outline"
-            className="mt-2"
+            className="mt-4"
+            size="sm"
           >
             <RotateCcw className="h-4 w-4 mr-2" />
-            {isPdfLoading ? "Loading..." : "Retry"}
+            {isPdfLoading ? "Retrying..." : "Retry Now"}
           </Button>
         </div>
       ) : isPdfLoading ? (
-        <div className="flex h-full items-center justify-center bg-muted text-muted-foreground">
-          <p>Loading document...</p>
+        <div className="flex h-full flex-col items-center justify-center gap-3 bg-muted text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <p className="text-sm">Loading document...</p>
+          <p className="text-xs text-muted-foreground/70">This may take a moment for larger files</p>
         </div>
       ) : fileUrl ? (
         <iframe

@@ -126,14 +126,16 @@ export const documentService = {
     }
   },
 
-  // Get document as Blob (for viewing)
-  async downloadDocument(fileId: string): Promise<Blob> {
+  // Get document as Blob (for viewing) - with retry logic
+  async downloadDocument(fileId: string, retryCount: number = 0, maxRetries: number = 3): Promise<Blob> {
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
       if (!token) {
         throw new Error("No authentication token");
       }
+
+      console.log(`[DocumentService.downloadDocument] Attempt ${retryCount + 1}/${maxRetries + 1} - Downloading file ${fileId}`);
 
       const response = await axios.get(
         `${baseUrl}/files/${fileId}/download`,
@@ -142,6 +144,7 @@ export const documentService = {
             Authorization: `Bearer ${token}`,
           },
           responseType: "blob",
+          timeout: 300000, // 5-minute timeout for large file downloads (increased from 60s to handle slow networks)
         }
       );
 
@@ -165,7 +168,26 @@ export const documentService = {
 
       return blob;
     } catch (error) {
+      const axiosError = error as any;
+      const isNetworkError = axiosError?.code === "ERR_NETWORK" ||
+                            axiosError?.message === "Network Error" ||
+                            axiosError?.response?.status === 502 ||
+                            axiosError?.response?.status === 503 ||
+                            axiosError?.response?.status === 504;
+
       console.error("[DocumentService] Error downloading document:", error);
+      console.error("[DocumentService] Error code:", axiosError?.code);
+      console.error("[DocumentService] Error message:", axiosError?.message);
+
+      // Retry on network errors
+      if (isNetworkError && retryCount < maxRetries) {
+        const delayMs = Math.min(1000 * Math.pow(2, retryCount), 10000); // Exponential backoff: 1s, 2s, 4s, max 10s
+        console.log(`[DocumentService] Retrying download in ${delayMs}ms...`);
+
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        return this.downloadDocument(fileId, retryCount + 1, maxRetries);
+      }
+
       throw error;
     }
   },
