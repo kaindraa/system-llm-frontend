@@ -1,8 +1,8 @@
 #!/usr/bin/env node
+// Updated: 2026-01-08
 
 const { spawn } = require('node:child_process')
 const path = require('path')
-const fs = require('fs')
 
 const env = {
   ...process.env,
@@ -16,11 +16,11 @@ const env = {
   const command = args.join(' ')
 
   if (command === 'pnpm run start') {
-    console.log('[docker-entrypoint] Starting Next.js server on 0.0.0.0:3000...')
+    console.log('[docker-entrypoint] Starting Next.js standalone server on 0.0.0.0:3000...')
 
-    // When using standalone output, next start will use the built app
-    // Start with: next start
-    await exec('node /app/.next/standalone/node_modules/.bin/next start', env)
+    // Use next start from /app/node_modules
+    // Working directory is set to /app/.next/standalone
+    await exec('node /app/node_modules/next/dist/bin/next start', env)
   } else {
     // launch application with explicit environment variables
     await exec(command, env)
