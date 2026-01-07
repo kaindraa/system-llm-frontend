@@ -29,14 +29,20 @@ export const DocumentSidebar = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const [isViewerLoading, setIsViewerLoading] = useState(false);
 
-  // Fetch documents on mount
+  // Pagination state
+  const [currentOffset, setCurrentOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const ITEMS_PER_PAGE = 5; // Load 5 documents at a time instead of 100
+
+  // Fetch documents on mount (first batch only)
   useEffect(() => {
     const loadDocuments = async () => {
       try {
-        console.log("[DocumentSidebar] Mounting, fetching documents...");
+        console.log("[DocumentSidebar] Mounting, fetching first batch of documents...");
         setIsLoading(true);
         setError(null);
-        const response = await documentService.listDocuments(0, 100);
+        const response = await documentService.listDocuments(0, ITEMS_PER_PAGE);
 
         console.log("[DocumentSidebar] Response:", response);
 
@@ -44,6 +50,10 @@ export const DocumentSidebar = ({
         console.log("[DocumentSidebar] Parsed documents:", docs);
 
         setDocuments(docs);
+        setCurrentOffset(ITEMS_PER_PAGE);
+
+        // Check if there are more documents
+        setHasMore(docs && docs.length >= ITEMS_PER_PAGE);
 
         if (docs && docs.length > 0) {
           console.log("[DocumentSidebar] Setting first doc as selected:", docs[0].id);
@@ -64,6 +74,32 @@ export const DocumentSidebar = ({
 
     loadDocuments();
   }, []);
+
+  // Load more documents when user clicks "Load More"
+  const handleLoadMore = async () => {
+    if (!hasMore || isLoadingMore) return;
+
+    try {
+      setIsLoadingMore(true);
+      console.log("[DocumentSidebar] Loading more documents from offset:", currentOffset);
+
+      const response = await documentService.listDocuments(currentOffset, ITEMS_PER_PAGE);
+      const newDocs = response?.items || [];
+
+      console.log("[DocumentSidebar] Loaded", newDocs.length, "more documents");
+
+      setDocuments(prev => [...prev, ...newDocs]);
+      setCurrentOffset(currentOffset + ITEMS_PER_PAGE);
+
+      // Check if there are more documents
+      setHasMore(newDocs.length >= ITEMS_PER_PAGE);
+    } catch (err) {
+      console.error("[DocumentSidebar] Error loading more documents:", err);
+      setError(err instanceof Error ? err.message : "Failed to load more documents");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
 
   // Handle selected source from message bubble
   useEffect(() => {
@@ -281,6 +317,28 @@ export const DocumentSidebar = ({
                           </div>
                         </button>
                       ))}
+
+                      {/* Load More Button */}
+                      {hasMore && (
+                        <button
+                          onClick={handleLoadMore}
+                          disabled={isLoadingMore}
+                          className={cn(
+                            "w-full px-3 py-2.5 text-sm font-medium text-center transition-colors",
+                            "border-t border-border hover:bg-muted",
+                            isLoadingMore && "opacity-50 cursor-not-allowed"
+                          )}
+                        >
+                          {isLoadingMore ? (
+                            <div className="flex items-center justify-center gap-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Loading...</span>
+                            </div>
+                          ) : (
+                            <span>Load More Documents</span>
+                          )}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
