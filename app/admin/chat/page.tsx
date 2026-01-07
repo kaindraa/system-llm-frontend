@@ -686,7 +686,7 @@ export default function AdminChatPage() {
                                     <div className="font-semibold text-yellow-400">
                                       Tool Calls:
                                     </div>
-                                    {msg.tool_calls.map((toolCall, tidx) => (
+                                    {msg.tool_calls.map((toolCall: any, tidx: number) => (
                                       <div
                                         key={tidx}
                                         className="ml-2 p-1 bg-background/50 rounded text-xs"
@@ -714,7 +714,7 @@ export default function AdminChatPage() {
                                     <div className="font-semibold text-green-400">
                                       Sources:
                                     </div>
-                                    {msg.sources.map((source, sidx) => (
+                                    {msg.sources.map((source: any, sidx: number) => (
                                       <div
                                         key={sidx}
                                         className="ml-2 p-1 bg-background/50 rounded text-xs"
