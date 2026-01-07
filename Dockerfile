@@ -35,10 +35,10 @@ RUN pnpm install --frozen-lockfile --prod=false
 # Copy application code
 COPY . .
 
-# Build application
+# Build application with standalone output
 RUN pnpm run build
 
-# Remove development dependencies
+# Remove development dependencies - but keep next and essential packages
 RUN pnpm prune --prod
 
 
@@ -46,20 +46,18 @@ RUN pnpm prune --prod
 FROM base
 
 # Copy built application from build stage
-COPY --from=build /app/.next /app/.next
+# Copy the standalone build output (has node_modules via .pnpm)
+COPY --from=build /app/.next/standalone /app
+# Copy pruned node_modules (has production dependencies)
 COPY --from=build /app/node_modules /app/node_modules
-COPY --from=build /app/package.json /app/package.json
-COPY --from=build /app/docker-entrypoint.js /app/docker-entrypoint.js
+# Copy static assets
+COPY --from=build /app/.next/static /app/.next/static
 
-# Make entrypoint executable
-RUN chmod +x /app/docker-entrypoint.js
+# WORKDIR should be /app
+WORKDIR /app
 
-# Set working directory to standalone directory
-WORKDIR /app/.next/standalone
-
-# Entrypoint sets up the container.
-ENTRYPOINT [ "/app/docker-entrypoint.js" ]
-
-# Start the server by default, this can be overwritten at runtime
+# Expose port
 EXPOSE 3000
-CMD [ "pnpm", "run", "start" ]
+
+# Start Next.js server
+CMD ["node", "node_modules/next/dist/bin/next", "start"]
