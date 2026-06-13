@@ -38,3 +38,6 @@ pnpm-debug.log*
 *.tmp
 *~
 .vercel
+
+# Sentry source-map upload auth token
+.env.sentry-build-plugin
