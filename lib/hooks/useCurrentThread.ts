@@ -83,6 +83,24 @@ function parseRealMessages(rawMessages: any[]): Message[] {
     }
   });
 
+  // Collect every tool actually called across the intermediate assistant messages.
+  // These carry tool_calls but get skipped below (no content), so we re-attach the
+  // collected list to the final assistant message — drives the "Completed · Used" badge.
+  const usedToolCalls: Array<{ name: string; args: Record<string, any>; id?: string }> = [];
+  const seenToolNames = new Set<string>();
+  rawMessages.forEach((msg) => {
+    if (msg.role === "assistant" && Array.isArray(msg.tool_calls)) {
+      msg.tool_calls.forEach((tc: any) => {
+        const name = (tc?.name as string) || "";
+        if (name && !seenToolNames.has(name)) {
+          seenToolNames.add(name);
+          usedToolCalls.push({ name, args: tc.args || {}, id: tc.id });
+        }
+      });
+    }
+  });
+  console.log("[parseRealMessages] Tools used across turn:", usedToolCalls.map((t) => t.name));
+
   // Process messages
   const formattedMessages: Message[] = [];
   rawMessages.forEach((msg, idx) => {
@@ -109,10 +127,16 @@ function parseRealMessages(rawMessages: any[]): Message[] {
       tool_call_id: msg.tool_call_id,
     };
 
-    // Attach refined prompt to LAST assistant message (the one with actual content)
-    if (msg.role === "assistant" && msg.content && refinedPromptData) {
-      console.log(`[parseRealMessages] Attaching refinedPrompt to final assistant message #${idx}`);
-      baseMsg.refinedPrompt = refinedPromptData;
+    // Attach refined prompt + the tools used to the LAST assistant message (with content)
+    if (msg.role === "assistant" && msg.content) {
+      if (refinedPromptData) {
+        console.log(`[parseRealMessages] Attaching refinedPrompt to final assistant message #${idx}`);
+        baseMsg.refinedPrompt = refinedPromptData;
+      }
+      if (usedToolCalls.length > 0) {
+        console.log(`[parseRealMessages] Attaching ${usedToolCalls.length} used tool(s) to final assistant message #${idx}`);
+        baseMsg.tool_calls = usedToolCalls;
+      }
     }
 
     console.log(`[parseRealMessages] Including message #${idx}:`, {
