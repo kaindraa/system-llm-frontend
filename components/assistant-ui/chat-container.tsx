@@ -811,6 +811,12 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
   );
 };
 
+const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  refine_prompt: "refine prompt",
+  semantic_search: "semantic search",
+};
+const toolDisplayName = (name: string) => TOOL_DISPLAY_NAMES[name] ?? name;
+
 interface MessageBubbleProps {
   message: Message;
   isStreaming?: boolean;
@@ -893,7 +899,19 @@ const MessageBubbleComponent = ({
               </div>
             )}
 
-            {/* Completed indicator removed per user request (was a green "Completed" badge above each message) */}
+            {/* Completed with tools indicator — only when idle (done) and at least 1 tool was used */}
+            {loadingStage === "idle" && !isStreaming && message.tool_calls && message.tool_calls.length > 0 && (
+              <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 opacity-70">
+                <span>✓ Completed</span>
+                <span>·</span>
+                <span>
+                  Used:{" "}
+                  {message.tool_calls
+                    .map((t) => toolDisplayName(t.name))
+                    .join(", ")}
+                </span>
+              </div>
+            )}
           </>
         )}
 
