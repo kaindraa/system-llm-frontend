@@ -21,14 +21,24 @@ export const ThreadList: FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch conversations on mount only
+  // Fetch conversations on mount
   useEffect(() => {
     loadConversationsLocal();
   }, []);
 
-  const loadConversationsLocal = async () => {
+  // Auto-refresh the list when a brand-new session id appears in the URL
+  // (e.g. the first message just created a session). Silent = no list flicker,
+  // and we skip the fetch when the thread is already listed (normal navigation).
+  useEffect(() => {
+    if (!currentThreadId) return;
+    if (conversations.some((c) => c.id === currentThreadId)) return;
+    loadConversationsLocal(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentThreadId]);
+
+  const loadConversationsLocal = async (silent = false) => {
     try {
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       setError(null);
       console.log("[ThreadList] Fetching conversations from API...");
       const data = await listConversations();
@@ -43,7 +53,7 @@ export const ThreadList: FC = () => {
       console.error("[ThreadList] Error fetching:", err);
       setError(err instanceof Error ? err.message : "Failed to load conversations");
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
