@@ -893,27 +893,7 @@ const MessageBubbleComponent = ({
               </div>
             )}
 
-            {/* Priority 4: Completed indicator - show when streaming done and all tools finished */}
-            {!isStreaming && loadingStage === "idle" && !refinedPromptState?.isRefining && !ragSearchState?.isSearching && message.content && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-md text-sm bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300">
-                <span className="text-xs font-medium">
-                  Completed
-                  {(() => {
-                    const tools: string[] = [];
-                    if (message.refinedPrompt) tools.push("Refine Prompt");
-                    if (message.sources && message.sources.length > 0) tools.push("Semantic Search");
-                    if (message.tool_calls && Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
-                      const toolNames = message.tool_calls
-                        .filter(tc => tc && tc.name && typeof tc.name === 'string')
-                        .map(tc => tc.name)
-                        .filter((name, idx, arr) => arr.indexOf(name) === idx);
-                      tools.push(...toolNames);
-                    }
-                    return tools.length > 0 ? `, used ${tools.join(" and ")}` : "";
-                  })()}
-                </span>
-              </div>
-            )}
+            {/* Completed indicator removed per user request (was a green "Completed" badge above each message) */}
           </>
         )}
 
