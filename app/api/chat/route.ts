@@ -291,11 +291,13 @@ export async function POST(req: Request) {
 
                     // Handle done event - final response from assistant with sources
                     if (currentEventType === "done") {
-                      // Send done message with sources
+                      // Send done message with sources + the tools that ran
+                      // (tool_calls drives the "Completed · Used: ..." badge)
                       const finishResponse = {
                         type: "done",
                         content: data.content,
                         sources: data.sources || [],
+                        tool_calls: data.tool_calls || [],
                       };
                       console.log("[API Route] Sending done event and closing stream");
                       controller.enqueue(
