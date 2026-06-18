@@ -19,21 +19,26 @@ export default function FilePage() {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isUploadLoading, setIsUploadLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<FileDocument | null>(null);
+  const [isActionBusy, setIsActionBusy] = useState(false);
 
-  // Load files
-  const loadFiles = async (page: number = 1) => {
-    setIsLoading(true);
+  // Load files. `silent` skips the loading spinner (used by background polling).
+  const loadFiles = async (page: number = 1, silent: boolean = false) => {
+    if (!silent) setIsLoading(true);
     try {
       const skip = (page - 1) * PAGE_SIZE;
       const response = await fileService.listFiles(skip, PAGE_SIZE);
       setFiles(response.files);
       setTotal(response.total);
       setCurrentPage(page);
+      // Keep the selected file's detail panel in sync with fresh status.
+      setSelectedFile((prev) =>
+        prev ? response.files.find((f) => f.id === prev.id) ?? prev : prev
+      );
     } catch (error) {
       console.error("Error loading files:", error);
-      alert("Failed to load files");
+      if (!silent) alert("Failed to load files");
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
@@ -41,6 +46,15 @@ export default function FilePage() {
   useEffect(() => {
     loadFiles(1);
   }, []);
+
+  // Poll while any document is still processing, so stage/status stays live.
+  useEffect(() => {
+    const hasProcessing = files.some((f) => f.status === "processing");
+    if (!hasProcessing) return;
+    const interval = setInterval(() => loadFiles(currentPage, true), 3000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files, currentPage]);
 
   // Handle upload
   const handleFileUpload = async (file: File) => {
@@ -89,6 +103,34 @@ export default function FilePage() {
     }
   };
 
+  // Handle (re)process
+  const handleReprocess = async (file: FileDocument) => {
+    setIsActionBusy(true);
+    try {
+      await fileService.ingestFile(file.id);
+      await loadFiles(currentPage, true);
+    } catch (error) {
+      console.error("Error queuing ingestion:", error);
+      alert("Failed to start processing");
+    } finally {
+      setIsActionBusy(false);
+    }
+  };
+
+  // Handle cancel of an in-progress ingestion
+  const handleCancel = async (file: FileDocument) => {
+    setIsActionBusy(true);
+    try {
+      await fileService.cancelIngestion(file.id);
+      await loadFiles(currentPage, true);
+    } catch (error) {
+      console.error("Error cancelling ingestion:", error);
+      alert("Failed to request cancellation");
+    } finally {
+      setIsActionBusy(false);
+    }
+  };
+
   // Handle page change
   const handlePageChange = (page: number) => {
     loadFiles(page);
@@ -130,6 +172,9 @@ export default function FilePage() {
           <FileDetailViewer
             file={selectedFile}
             isLoading={isLoading}
+            isActionBusy={isActionBusy}
+            onReprocess={handleReprocess}
+            onCancel={handleCancel}
           />
         </div>
       </div>

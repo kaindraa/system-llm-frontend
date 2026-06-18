@@ -1,12 +1,31 @@
 import apiClient from "@/lib/api/client";
 
+export type FileStatus =
+  | "uploaded"
+  | "processing"
+  | "processed"
+  | "failed"
+  | "cancelled";
+
+export type IngestionStage =
+  | "queued"
+  | "parsing"
+  | "chunking"
+  | "embedding"
+  | "inserting"
+  | "done";
+
 export interface FileDocument {
   id: string;
   filename: string;
   original_filename: string;
   file_size: number;
   mime_type: string;
-  status: "uploaded" | "processing" | "processed" | "failed";
+  status: FileStatus;
+  current_stage?: IngestionStage | null;
+  last_error?: string | null;
+  retry_count?: number;
+  cancel_requested?: boolean;
   uploaded_at: string;
   processed_at?: string;
 }
@@ -122,11 +141,23 @@ export const fileService = {
 
   async updateFileStatus(
     id: string,
-    status: "uploaded" | "processing" | "processed" | "failed"
+    status: FileStatus
   ): Promise<FileDocument> {
     const response = await apiClient.patch<FileDocument>(`/files/${id}/status`, {
       status,
     });
+    return response.data;
+  },
+
+  // Queue (or re-queue) a document for ingestion: parse -> chunk -> embed -> index.
+  async ingestFile(id: string): Promise<FileDocument> {
+    const response = await apiClient.post<FileDocument>(`/files/${id}/ingest`);
+    return response.data;
+  },
+
+  // Request cooperative cancellation of an in-progress ingestion.
+  async cancelIngestion(id: string): Promise<FileDocument> {
+    const response = await apiClient.post<FileDocument>(`/files/${id}/cancel`);
     return response.data;
   },
 };

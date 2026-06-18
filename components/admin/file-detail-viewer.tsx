@@ -5,15 +5,22 @@ import { useState, useEffect } from "react";
 import { AlertCircle } from "lucide-react";
 import type { FileDocument } from "@/lib/services/file";
 import { fileService } from "@/lib/services/file";
+import { FileProcessingPanel } from "@/components/admin/file-processing-panel";
 
 interface FileDetailViewerProps {
   file: FileDocument | null;
   isLoading?: boolean;
+  isActionBusy?: boolean;
+  onReprocess?: (file: FileDocument) => void;
+  onCancel?: (file: FileDocument) => void;
 }
 
 export const FileDetailViewer: FC<FileDetailViewerProps> = ({
   file,
   isLoading = false,
+  isActionBusy = false,
+  onReprocess,
+  onCancel,
 }) => {
   const [fileUrl, setFileUrl] = useState<string>("");
   const [isPdfLoading, setIsPdfLoading] = useState(false);
@@ -76,7 +83,10 @@ export const FileDetailViewer: FC<FileDetailViewerProps> = ({
         URL.revokeObjectURL(fileUrl);
       }
     };
-  }, [file]);
+    // Only re-download when the selected file changes — NOT on every status
+    // poll (which replaces the file object with the same id).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file?.id]);
 
   if (!file) {
     return (
@@ -96,6 +106,18 @@ export const FileDetailViewer: FC<FileDetailViewerProps> = ({
           {file.original_filename}
         </h2>
       </div>
+
+      {/* Processing status / progress / actions */}
+      {onReprocess && onCancel && (
+        <div className="border-b flex-shrink-0">
+          <FileProcessingPanel
+            file={file}
+            isBusy={isActionBusy}
+            onReprocess={onReprocess}
+            onCancel={onCancel}
+          />
+        </div>
+      )}
 
       {/* PDF Viewer - Full Space */}
       <div className="flex-1 overflow-hidden bg-muted">

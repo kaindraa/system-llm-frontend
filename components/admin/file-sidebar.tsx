@@ -37,6 +37,8 @@ export const FileSidebar: FC<FileSidebarProps> = ({
         return "text-green-600";
       case "failed":
         return "text-red-600";
+      case "cancelled":
+        return "text-amber-600";
       default:
         return "text-gray-600";
     }
@@ -94,6 +96,14 @@ export const FileSidebar: FC<FileSidebarProps> = ({
                       )}`}
                     >
                       {file.status}
+                      {file.status === "processing" &&
+                        file.current_stage &&
+                        file.current_stage !== "queued" && (
+                          <span className="text-muted-foreground">
+                            {" "}
+                            · {file.current_stage}
+                          </span>
+                        )}
                     </div>
                   </div>
                 </button>
