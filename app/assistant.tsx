@@ -176,8 +176,8 @@ const AssistantContent = ({
 
         if (response.ok) {
           const data = await response.json();
-          // Check if session status is "analyzed"
-          const isAnalyzed = data.status === "analyzed";
+          // Session is closed (non-resumable) when analyzed OR ended without analysis
+          const isAnalyzed = data.status === "analyzed" || data.status === "ended";
           // Only update state if status changed (avoid unnecessary re-renders)
           if (isAnalyzed !== lastAnalyzedStatusRef.current) {
             lastAnalyzedStatusRef.current = isAnalyzed;

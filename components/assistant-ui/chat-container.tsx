@@ -803,7 +803,8 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
           isSending ||
           isCreatingConversation ||
           isSessionEnding ||
-          sessionMetadata?.status === "analyzed"
+          sessionMetadata?.status === "analyzed" ||
+          sessionMetadata?.status === "ended"
         }
         formRef={formRef as React.RefObject<HTMLFormElement | null>}
       />

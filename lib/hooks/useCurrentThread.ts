@@ -180,7 +180,7 @@ function parseRealMessages(rawMessages: any[]): Message[] {
 
 export interface SessionMetadata {
   id: string;
-  status: "active" | "analyzed";
+  status: "active" | "ended" | "analyzed";
   summary?: string;
   comprehension_level?: "low" | "medium" | "high";
   analyzed_at?: string;
