@@ -13,16 +13,8 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    // DEBUG: Log incoming request
-    console.log("[API Chat Route] Incoming request:");
-    console.log("[API Chat Route] Headers:", {
-      authorization: req.headers.get("authorization") ? `${req.headers.get("authorization")?.substring(0, 30)}...` : "MISSING",
-      contentType: req.headers.get("content-type"),
-    });
-
     // @assistant-ui library might send messages in different formats
     const { messages, message, threadId, sessionId } = body;
-    console.log("[API Chat Route] Body:", { messages: messages ? `${messages.length} messages` : "none", threadId, sessionId });
 
     let userMessage = "";
     const existingSessionId = threadId || sessionId;
@@ -128,19 +120,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // DEBUG: Log token extraction details
-    console.log("[API Chat Route] Token extraction:");
-    console.log("[API Chat Route] Auth header received:", authHeader ? `${authHeader.substring(0, 30)}...` : "MISSING");
-    console.log("[API Chat Route] Extracted token length:", token?.length);
-    console.log("[API Chat Route] Extracted token first 50:", token?.substring(0, 50));
-    console.log("[API Chat Route] Extracted token last 20:", `...${token?.substring(Math.max(0, token.length - 20))}`);
-
     // Forward request to backend
     const messageUrl = `${backendUrl}/chat/sessions/${session}/messages`;
-    console.log("[API Chat Route] Forwarding to backend:");
-    console.log("[API Chat Route] URL:", messageUrl);
-    console.log("[API Chat Route] Authorization header being sent:", token ? `Bearer ${token.substring(0, 20)}...` : "MISSING");
-    console.log("[API Chat Route] Message:", userMessage);
 
     const backendResponse = await fetch(messageUrl, {
       method: "POST",
@@ -151,11 +132,8 @@ export async function POST(req: Request) {
       body: JSON.stringify({ message: userMessage }),
     });
 
-    console.log("[API Chat Route] Backend response status:", backendResponse.status);
-
     if (!backendResponse.ok) {
       const error = await backendResponse.text();
-      console.log("[API Chat Route] Backend error:", error);
       return new Response(error, {
         status: backendResponse.status,
         headers: {
@@ -202,7 +180,6 @@ export async function POST(req: Request) {
               // Parse SSE format
               if (line.startsWith("event:")) {
                 currentEventType = line.slice(6).trim();
-                console.log("[API Route] Detected event type:", currentEventType);
                 continue;
               }
 
@@ -211,17 +188,14 @@ export async function POST(req: Request) {
                 if (dataStr) {
                   try {
                     const data = JSON.parse(dataStr);
-                    console.log("[API Route] Processing event:", currentEventType, "data keys:", Object.keys(data));
 
                     // Skip user_message echo - don't send to frontend
                     if (currentEventType === "user_message") {
-                      console.log("[API Route] Skipping user_message echo");
                       continue;
                     }
 
                     // Handle refined prompt events - forward directly to frontend
                     if (currentEventType === "refine_prompt") {
-                      console.log("[API Route] ✓ Refine prompt event detected! Status:", data.status);
                       const refinedPromptResponse = {
                         type: "refine_prompt",
                         content: {
@@ -230,7 +204,6 @@ export async function POST(req: Request) {
                           error: data.error,
                         },
                       };
-                      console.log("[API Route] Forwarding refine_prompt to frontend:", refinedPromptResponse);
                       controller.enqueue(
                         encoder.encode(`data: ${JSON.stringify(refinedPromptResponse)}\n\n`)
                       );
@@ -239,7 +212,6 @@ export async function POST(req: Request) {
 
                     // Handle refined prompt result events - forward directly to frontend
                     if (currentEventType === "refine_prompt_result") {
-                      console.log("[API Route] ✓ Refine prompt result event detected!");
                       const refinedPromptResultResponse = {
                         type: "refine_prompt_result",
                         content: {
@@ -249,7 +221,6 @@ export async function POST(req: Request) {
                           error: data.error,
                         },
                       };
-                      console.log("[API Route] Forwarding refine_prompt_result to frontend:", refinedPromptResultResponse);
                       controller.enqueue(
                         encoder.encode(`data: ${JSON.stringify(refinedPromptResultResponse)}\n\n`)
                       );
@@ -258,7 +229,6 @@ export async function POST(req: Request) {
 
                     // Handle RAG search events - forward directly to frontend
                     if (currentEventType === "rag_search") {
-                      console.log("[API Route] ✓ RAG search event detected! Status:", data.status, "Query:", data.query);
                       const ragResponse = {
                         type: "rag_search",
                         query: data.query,
@@ -267,7 +237,6 @@ export async function POST(req: Request) {
                         processing_time: data.processing_time,
                         error: data.error,
                       };
-                      console.log("[API Route] Forwarding RAG response to frontend:", ragResponse);
                       controller.enqueue(
                         encoder.encode(`data: ${JSON.stringify(ragResponse)}\n\n`)
                       );
@@ -299,7 +268,6 @@ export async function POST(req: Request) {
                         sources: data.sources || [],
                         tool_calls: data.tool_calls || [],
                       };
-                      console.log("[API Route] Sending done event and closing stream");
                       controller.enqueue(
                         encoder.encode(`data: ${JSON.stringify(finishResponse)}\n\n`)
                       );

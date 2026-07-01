@@ -78,12 +78,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("token");
       const userStr = localStorage.getItem("user");
-      let user = userStr ? JSON.parse(userStr) : null;
+      let user = null;
+
+      try {
+        user = userStr ? JSON.parse(userStr) : null;
+      } catch {
+        localStorage.removeItem("user");
+      }
 
       // Normalize user role when loading from localStorage
       user = normalizeUser(user);
-
-      console.log("[AuthStore] Initialized - user:", user?.email, "role:", user?.role);
       set({ user, token, isAuthenticated: !!(user && token), isLoading: false });
     } else {
       set({ isLoading: false });

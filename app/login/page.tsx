@@ -40,39 +40,15 @@ export default function LoginPage() {
       // Login and get token
       const response = await authService.login(data);
 
-      // DEBUG: Log token from login response
-      console.log("[Login] Response from backend:", response);
-      const token = response.access_token;
-      console.log("[Login] Token length:", token?.length);
-      console.log("[Login] Token first 50:", token?.substring(0, 50));
-      if (token) {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          try {
-            const payload = JSON.parse(atob(parts[1]));
-            console.log("[Login] Token payload:", payload);
-          } catch (e) {
-            console.log("[Login] Could not decode payload");
-          }
-        }
-      }
-
       // Store token immediately to localStorage before next API call
-      console.log("[Login] Storing token to localStorage");
       localStorage.setItem("token", response.access_token);
-
-      // Delete any old token cookie to prevent middleware from using stale token
-      console.log("[Login] Deleting old token cookie");
-      document.cookie = "token=; expires=" + new Date().toUTCString() + "; path=/";
-
-      // Verify it was stored
-      const storedToken = localStorage.getItem("token");
-      console.log("[Login] Verified token stored:", storedToken?.substring(0, 50));
 
       setToken(response.access_token);
 
-      // Get user data
-      const user = await authService.getCurrentUser();
+      // Use user payload from login response when available to avoid an
+      // immediate second auth round-trip. Fall back to /auth/me for backward
+      // compatibility with older backend releases.
+      const user = response.user ?? (await authService.getCurrentUserWithRetry());
       setUser(user);
 
       // Redirect to dashboard

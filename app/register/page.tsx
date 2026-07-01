@@ -63,8 +63,10 @@ export default function RegisterPage() {
       localStorage.setItem("token", loginResponse.access_token);
       setToken(loginResponse.access_token);
 
-      // Get user data
-      const user = await authService.getCurrentUser();
+      // Reuse user returned by login when available to avoid one extra request
+      // on the hot auth path.
+      const user =
+        loginResponse.user ?? (await authService.getCurrentUserWithRetry());
       setUser(user);
 
       // Redirect to dashboard

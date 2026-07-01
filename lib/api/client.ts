@@ -35,7 +35,11 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const requestUrl = String(error.config?.url || "");
+    const isAuthHandshake =
+      requestUrl.includes("/auth/login") || requestUrl.includes("/auth/register");
+
+    if (error.response?.status === 401 && !isAuthHandshake) {
       // Unauthorized - clear token and redirect to login
       if (typeof window !== "undefined") {
         localStorage.removeItem("token");
