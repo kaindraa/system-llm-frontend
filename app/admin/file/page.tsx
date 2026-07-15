@@ -107,13 +107,29 @@ export default function FilePage() {
   const handleReprocess = async (file: FileDocument) => {
     setIsActionBusy(true);
     try {
-      await fileService.ingestFile(file.id);
-      await loadFiles(currentPage, true);
+      const queuedFile = await fileService.ingestFile(file.id);
+      // The worker claims this asynchronously. Reflect the successful queue
+      // response immediately; a later list refresh must not turn it into a
+      // false "Failed to start processing" alert.
+      setFiles((prev) =>
+        prev.map((item) => (item.id === queuedFile.id ? queuedFile : item))
+      );
+      setSelectedFile((prev) =>
+        prev?.id === queuedFile.id ? queuedFile : prev
+      );
     } catch (error) {
       console.error("Error queuing ingestion:", error);
       alert("Failed to start processing");
+      return;
     } finally {
       setIsActionBusy(false);
+    }
+
+    try {
+      await loadFiles(currentPage, true);
+    } catch (error) {
+      // Polling will retry shortly. The document was already queued above.
+      console.error("Error refreshing files after queueing ingestion:", error);
     }
   };
 
