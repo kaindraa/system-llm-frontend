@@ -101,7 +101,7 @@ export const FileSidebar: FC<FileSidebarProps> = ({
                         file.current_stage !== "queued" && (
                           <span className="text-muted-foreground">
                             {" "}
-                            · {file.current_stage}
+                            · {file.current_stage} {typeof file.progress_percent === "number" ? `${file.progress_percent}%` : ""}
                           </span>
                         )}
                     </div>

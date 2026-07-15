@@ -23,6 +23,10 @@ export interface FileDocument {
   mime_type: string;
   status: FileStatus;
   current_stage?: IngestionStage | null;
+  progress_percent?: number;
+  processed_pages?: number;
+  total_pages?: number;
+  processing_detail?: string | null;
   last_error?: string | null;
   retry_count?: number;
   cancel_requested?: boolean;

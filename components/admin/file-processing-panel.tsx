@@ -112,35 +112,50 @@ export const FileProcessingPanel: FC<FileProcessingPanelProps> = ({
 
       {/* Stage checklist (only meaningful while processing or once processed) */}
       {(isProcessing || isProcessed) && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-          {STAGES.map((stage, i) => {
-            const state = stageState(i);
-            return (
+        <div className="space-y-2.5">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            {STAGES.map((stage, i) => {
+              const state = stageState(i);
+              return (
+                <div key={stage.key} className="flex items-center gap-1.5 text-xs">
+                  {state === "done" ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  ) : state === "active" ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                  ) : (
+                    <Circle className="h-4 w-4 text-gray-300" />
+                  )}
+                  <span
+                    className={
+                      state === "done"
+                        ? "text-green-700"
+                        : state === "active"
+                          ? "font-medium text-blue-700"
+                          : "text-muted-foreground"
+                    }
+                  >
+                    {stage.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="space-y-1">
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
               <div
-                key={stage.key}
-                className="flex items-center gap-1.5 text-xs"
-              >
-                {state === "done" ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                ) : state === "active" ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                ) : (
-                  <Circle className="h-4 w-4 text-gray-300" />
-                )}
-                <span
-                  className={
-                    state === "done"
-                      ? "text-green-700"
-                      : state === "active"
-                        ? "font-medium text-blue-700"
-                        : "text-muted-foreground"
-                  }
-                >
-                  {stage.label}
-                </span>
-              </div>
-            );
-          })}
+                className="h-full rounded-full bg-blue-600 transition-all duration-500"
+                style={{ width: `${isProcessed ? 100 : file.progress_percent ?? 0}%` }}
+              />
+            </div>
+            <div className="flex justify-between gap-3 text-xs text-muted-foreground">
+              <span>{file.processing_detail || "Preparing document"}</span>
+              <span className="shrink-0">
+                {file.total_pages && file.current_stage === "parsing"
+                  ? `${file.processed_pages ?? 0}/${file.total_pages} pages`
+                  : `${isProcessed ? 100 : file.progress_percent ?? 0}%`}
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
