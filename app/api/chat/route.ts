@@ -280,7 +280,7 @@ export async function POST(req: Request) {
                     if (currentEventType === "error") {
                       const errorResponse = {
                         type: "error",
-                        message: data.message || "Unknown error",
+                        message: data.error || data.message || "Unknown error",
                       };
                       controller.enqueue(
                         encoder.encode(`data: ${JSON.stringify(errorResponse)}\n\n`)

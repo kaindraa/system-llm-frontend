@@ -512,6 +512,28 @@ export const ChatContainer = ({ config, selectedModelName, onSourceClick, isSess
                     });
                   }
 
+                  // A backend/provider failure is an SSE event, not a failed
+                  // fetch. Replace the empty streaming bubble and end locally.
+                  if (data.type === "error") {
+                    const errorMessage = data.message || "Model gagal merespons. Coba lagi.";
+                    setMessages((prev) => {
+                      const updated = [...prev];
+                      if (updated.length > 0) {
+                        updated[updated.length - 1] = {
+                          ...updated[updated.length - 1],
+                          content: errorMessage,
+                        };
+                      }
+                      return updated;
+                    });
+                    streamFinished = true;
+                    setIsStreaming(false);
+                    setLoadingStage("idle");
+                    setRagSearchState({ isSearching: false });
+                    setRefinedPromptState({ isRefining: false });
+                    break;
+                  }
+
                   // Handle done event with sources and tool_calls
                   if (data.type === "done") {
                     console.log("[ChatContainer] ✅ DONE event received!");
